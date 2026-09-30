@@ -1,0 +1,33 @@
+# Resultados de compilação e testes
+**/bin/
+**/obj/
+**/TestResults/
+**/coverage/
+*.coverage
+*.coveragexml
+
+# Configurações individuais do editor
+.vs/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+
+# Configurações e chaves locais; exemplos sem valores reais podem ser versionados
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/secrets.json
+secrets/
+*.key
+*.pem
+*.pfx
+*.p12
+
+# Arquivos temporários
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

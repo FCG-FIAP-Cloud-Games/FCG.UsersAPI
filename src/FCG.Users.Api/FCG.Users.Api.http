@@ -1,0 +1,13 @@
+@baseUrl = http://localhost:5088
+
+### Saúde do processo
+GET {{baseUrl}}/health
+Accept: application/json
+
+### Documento OpenAPI, disponível em Development com Swagger habilitado
+GET {{baseUrl}}/swagger/v1/swagger.json
+Accept: application/json
+
+### Resposta padronizada para rota inexistente
+GET {{baseUrl}}/rota-inexistente
+Accept: application/problem+json
