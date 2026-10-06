@@ -204,7 +204,7 @@ public sealed class TestesManipuladorLogin
             Guid.NewGuid(),
             "Usuário de Teste",
             "12345678900",
-            Agora.AddYears(-20),
+            DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20),
             "usuario@exemplo.com",
             "hash::Senha@123",
             PerfisSistema.UsuarioId,
@@ -274,13 +274,12 @@ public sealed class TestesManipuladorLogin
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken tokenCancelamento = default) =>
             Task.FromResult(true);
 
-        public Task<bool> TentarAdicionarAsync(
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(
             Usuario usuario,
-            CancellationToken tokenCancelamento = default) =>
-            Task.FromResult(true);
+            LogUsuario registroCadastro,
+            CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
 
-        public Task AtualizarAsync(Usuario usuario, CancellationToken tokenCancelamento = default) =>
-            Task.CompletedTask;
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 
     private sealed class RepositorioTokensStub : IRepositorioTokens

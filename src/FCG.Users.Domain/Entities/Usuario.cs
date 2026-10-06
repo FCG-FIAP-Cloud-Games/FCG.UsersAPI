@@ -3,13 +3,13 @@ namespace FCG.Users.Domain.Entities;
 public sealed class Usuario
 {
     public const int TamanhoMaximoNome = 100;
-    public const int TamanhoMaximoCpf = 100;
+    public const int TamanhoMaximoCpf = 11;
     public const int TamanhoMaximoEmail = 150;
 
     public Guid Id { get; private set; }
     public string Nome { get; private set; }
     public string CPF { get; private set; }
-    public DateTimeOffset DataNascimento { get; private set; }
+    public DateOnly DataNascimento { get; private set; }
     public string Email { get; private set; }
     public string SenhaHash { get; private set; }
     public Guid PerfilId { get; private set; }
@@ -29,7 +29,7 @@ public sealed class Usuario
         Guid id,
         string nome,
         string cpf,
-        DateTimeOffset dataNascimento,
+        DateOnly dataNascimento,
         string email,
         string senhaHash,
         Guid perfilId,
@@ -40,8 +40,8 @@ public sealed class Usuario
         ArgumentException.ThrowIfNullOrWhiteSpace(cpf);
         ArgumentException.ThrowIfNullOrWhiteSpace(senhaHash);
 
-        if (cpf.Length > TamanhoMaximoCpf)
-            throw new ArgumentOutOfRangeException(nameof(cpf));
+        if (cpf.Length != TamanhoMaximoCpf || cpf.Any(caractere => caractere is < '0' or > '9'))
+            throw new ArgumentException("O CPF deve conter exatamente 11 dígitos de 0 a 9, sem formatação.", nameof(cpf));
 
         Id = id;
         Nome = nome;
@@ -56,7 +56,7 @@ public sealed class Usuario
 
     public void AtualizarDados(
         string nome,
-        DateTimeOffset dataNascimento,
+        DateOnly dataNascimento,
         string email)
     {
         ValidarDados(nome, dataNascimento, email, PerfilId, CriadoEmUtc);
@@ -91,7 +91,7 @@ public sealed class Usuario
 
     private static void ValidarDados(
         string nome,
-        DateTimeOffset dataNascimento,
+        DateOnly dataNascimento,
         string email,
         Guid perfilId,
         DateTimeOffset criadoEmUtc)
@@ -108,8 +108,8 @@ public sealed class Usuario
         if (perfilId == Guid.Empty)
             throw new ArgumentException("O perfil é obrigatório.", nameof(perfilId));
 
-        if (dataNascimento.Offset != TimeSpan.Zero)
-            throw new ArgumentException("A data de nascimento deve estar em UTC.", nameof(dataNascimento));
+        if (dataNascimento == default)
+            throw new ArgumentException("A data de nascimento é obrigatória.", nameof(dataNascimento));
 
         if (criadoEmUtc.Offset != TimeSpan.Zero)
             throw new ArgumentException("A data de criação deve estar em UTC.", nameof(criadoEmUtc));

@@ -57,11 +57,25 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         Assert.False(repositorio.Consultado);
     }
 
+    [Theory]
+    [InlineData(ResultadoGravacaoUsuario.ConflitoEmail)]
+    [InlineData(ResultadoGravacaoUsuario.ConflitoCpf)]
+    public async Task ProcessarNaoInformaSucessoQuandoGravacaoDoPerfilFalha(ResultadoGravacaoUsuario gravacao)
+    {
+        var usuario = CriarUsuario();
+        var repositorio = new RepositorioStub(usuario) { ResultadoGravacao = gravacao };
+        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manipulador.ProcessarAsync(
+            new ComandoAlterarPerfilUsuario(usuario.Id, PerfisSistema.AdministradorId),
+            TestContext.Current.CancellationToken));
+    }
+
     private static Usuario CriarUsuario() => new(
         Guid.NewGuid(),
         "Usuário",
         "12345678900",
-        Agora.AddYears(-20),
+        DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20),
         "usuario@exemplo.com",
         "hash",
         PerfisSistema.UsuarioId,
@@ -70,6 +84,7 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
     private sealed class RepositorioStub(Usuario? usuario) : IRepositoryUsuarios
     {
         public bool PerfilExiste { get; init; } = true;
+        public ResultadoGravacaoUsuario ResultadoGravacao { get; init; } = ResultadoGravacaoUsuario.Sucesso;
         public bool Consultado { get; private set; }
         public bool Atualizado { get; private set; }
 
@@ -82,10 +97,10 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken token = default) =>
             Task.FromResult(PerfilExiste);
 
-        public Task AtualizarAsync(Usuario item, CancellationToken token = default)
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, CancellationToken token = default)
         {
             Atualizado = true;
-            return Task.CompletedTask;
+            return Task.FromResult(ResultadoGravacao);
         }
 
         public Task<Usuario?> ObterPorEmailAsync(string email, CancellationToken token = default) =>
@@ -103,7 +118,6 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorarId, CancellationToken token = default) =>
             Task.FromResult(false);
 
-        public Task<bool> TentarAdicionarAsync(Usuario item, CancellationToken token = default) =>
-            Task.FromResult(true);
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 }

@@ -32,7 +32,7 @@ public sealed class ManipuladorCriarUsuario
         var nome = NormalizarNome(comando.Nome);
         var cpf = NormalizarCpf(comando.CPF);
         var email = NormalizarEmail(comando.Email);
-        var dataNascimento = comando.DataNascimento.ToUniversalTime();
+        var dataNascimento = comando.DataNascimento;
         var erros = Validar(comando, nome, cpf, email, dataNascimento, _relogio.GetUtcNow());
 
         if (erros.Count > 0)
@@ -47,6 +47,7 @@ public sealed class ManipuladorCriarUsuario
         if (await _repositorioUsuarios.ExisteCpfAsync(cpf, null, tokenCancelamento))
             return ResultadoCriarUsuario.ConflitoCpf();
 
+        var agora = _relogio.GetUtcNow();
         var usuario = new Usuario(
             Guid.NewGuid(),
             nome,
@@ -55,13 +56,18 @@ public sealed class ManipuladorCriarUsuario
             email!,
             _hashSenha.Criar(comando.Senha),
             comando.PerfilId,
-            _relogio.GetUtcNow());
+            agora);
+        var registroCadastro = LogUsuario.RegistrarCadastro(usuario.Id, agora);
 
-        var adicionado = await _repositorioUsuarios.TentarAdicionarAsync(usuario, tokenCancelamento);
+        var gravacao = await _repositorioUsuarios.TentarAdicionarAsync(usuario, registroCadastro, tokenCancelamento);
 
-        return adicionado
-            ? ResultadoCriarUsuario.Criado(DadosUsuario.De(usuario))
-            : ResultadoCriarUsuario.ConflitoEmail();
+        return gravacao switch
+        {
+            ResultadoGravacaoUsuario.Sucesso => ResultadoCriarUsuario.Criado(DadosUsuario.De(usuario)),
+            ResultadoGravacaoUsuario.ConflitoEmail => ResultadoCriarUsuario.ConflitoEmail(),
+            ResultadoGravacaoUsuario.ConflitoCpf => ResultadoCriarUsuario.ConflitoCpf(),
+            _ => throw new InvalidOperationException("O repositório retornou um resultado de cadastro desconhecido.")
+        };
     }
 
     internal static string NormalizarNome(string? nome) =>
@@ -69,7 +75,7 @@ public sealed class ManipuladorCriarUsuario
             ' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     internal static string NormalizarCpf(string? cpf) =>
-        new((cpf ?? string.Empty).Where(char.IsDigit).ToArray());
+        new((cpf ?? string.Empty).Where(caractere => caractere is not '.' and not '-' && !char.IsWhiteSpace(caractere)).ToArray());
 
     internal static string? NormalizarEmail(string? email)
     {
@@ -88,18 +94,18 @@ public sealed class ManipuladorCriarUsuario
         string nome,
         string cpf,
         string? email,
-        DateTimeOffset dataNascimento,
+        DateOnly dataNascimento,
         DateTimeOffset agora)
     {
         var erros = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
         if (nome.Length is < TamanhoMinimoNome or > Usuario.TamanhoMaximoNome)
             erros["nome"] = [$"O nome deve conter entre {TamanhoMinimoNome} e {Usuario.TamanhoMaximoNome} caracteres."];
-        if (string.IsNullOrWhiteSpace(cpf))
-            erros["cpf"] = ["O CPF é obrigatório."];
+        if (cpf.Length != Usuario.TamanhoMaximoCpf || cpf.Any(caractere => caractere is < '0' or > '9'))
+            erros["cpf"] = ["O CPF deve conter exatamente 11 dígitos de 0 a 9."];
         if (email is null)
             erros["email"] = ["Informe um e-mail válido."];
-        if (comando.DataNascimento == default || dataNascimento > agora)
+        if (comando.DataNascimento == default || dataNascimento > DateOnly.FromDateTime(agora.UtcDateTime))
             erros["dataNascimento"] = ["Informe uma data de nascimento válida e não futura."];
         if (!SenhaValida(comando.Senha))
             erros["senha"] = ["A senha deve ter ao menos 8 caracteres, com maiúscula, minúscula, número e caractere especial."];

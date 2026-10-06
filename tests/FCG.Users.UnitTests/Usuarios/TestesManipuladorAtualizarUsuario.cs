@@ -65,12 +65,54 @@ public sealed class TestesManipuladorAtualizarUsuario
         Assert.False(repositorio.Atualizado);
     }
 
+    [Fact]
+    public async Task ProcessarTraduzEmailOcupadoEntreConsultaEGravacao()
+    {
+        var usuario = CriarUsuario();
+        var repositorio = new RepositorioStub(usuario) { ResultadoGravacao = ResultadoGravacaoUsuario.ConflitoEmail };
+
+        var resultado = await CriarManipulador(repositorio).ProcessarAsync(
+            CriarComando(usuario.Id), TestContext.Current.CancellationToken);
+
+        Assert.Equal(StatusAtualizacaoUsuario.EmailJaCadastrado, resultado.Status);
+        Assert.Null(resultado.Usuario);
+        Assert.True(repositorio.Atualizado);
+    }
+
+    [Fact]
+    public async Task ProcessarNaoOcultaConflitoDeCpfInesperadoDuranteAtualizacao()
+    {
+        var usuario = CriarUsuario();
+        var repositorio = new RepositorioStub(usuario) { ResultadoGravacao = ResultadoGravacaoUsuario.ConflitoCpf };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CriarManipulador(repositorio).ProcessarAsync(
+            CriarComando(usuario.Id), TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProcessarComNascimentoAusenteOuFuturoNaoConsultaBanco(bool ausente)
+    {
+        var usuario = CriarUsuario();
+        var repositorio = new RepositorioStub(usuario);
+        var nascimento = ausente ? default : DateOnly.FromDateTime(Agora.UtcDateTime).AddDays(1);
+
+        var resultado = await CriarManipulador(repositorio).ProcessarAsync(
+            CriarComando(usuario.Id) with { DataNascimento = nascimento }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(StatusAtualizacaoUsuario.DadosInvalidos, resultado.Status);
+        Assert.Contains("dataNascimento", resultado.Erros);
+        Assert.False(repositorio.Consultado);
+        Assert.False(repositorio.Atualizado);
+    }
+
     private static Usuario CriarUsuario() => new(
-        Guid.NewGuid(), "Nome Original", "12345678900", Agora.AddYears(-20),
+        Guid.NewGuid(), "Nome Original", "12345678900", DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20),
         "original@exemplo.com", "hash-original", PerfilId, Agora.AddDays(-1));
 
     private static ComandoAtualizarUsuario CriarComando(Guid id) => new(
-        id, "  Novo   Nome ", Agora.AddYears(-18), " NOVO@EXEMPLO.COM ");
+        id, "  Novo   Nome ", DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-18), " NOVO@EXEMPLO.COM ");
 
     private static ManipuladorAtualizarUsuario CriarManipulador(RepositorioStub repositorio) =>
         new(repositorio, new RelogioFixo(Agora));
@@ -78,6 +120,7 @@ public sealed class TestesManipuladorAtualizarUsuario
     private sealed class RepositorioStub(Usuario? usuario) : IRepositoryUsuarios
     {
         public bool EmailExiste { get; init; }
+        public ResultadoGravacaoUsuario ResultadoGravacao { get; init; } = ResultadoGravacaoUsuario.Sucesso;
         public bool PerfilExiste { get; init; } = true;
         public bool Consultado { get; private set; }
         public bool Atualizado { get; private set; }
@@ -89,8 +132,8 @@ public sealed class TestesManipuladorAtualizarUsuario
         public Task<bool> ExisteEmailAsync(string email, Guid? ignorarId, CancellationToken token = default) { IdIgnoradoNaConsultaEmail = ignorarId; return Task.FromResult(EmailExiste); }
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorarId, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken token = default) => Task.FromResult(PerfilExiste);
-        public Task<bool> TentarAdicionarAsync(Usuario item, CancellationToken token = default) => Task.FromResult(true);
-        public Task AtualizarAsync(Usuario item, CancellationToken token = default) { Atualizado = true; return Task.CompletedTask; }
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, CancellationToken token = default) { Atualizado = true; return Task.FromResult(ResultadoGravacao); }
     }
 
     private sealed class RelogioFixo(DateTimeOffset agora) : TimeProvider

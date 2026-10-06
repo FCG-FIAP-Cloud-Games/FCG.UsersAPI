@@ -217,7 +217,7 @@ public sealed class TestesRenovacaoELogout
         Guid.NewGuid(),
         "Usuário",
         "12345678900",
-        Agora.AddYears(-20),
+        DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20),
         "usuario@exemplo.com",
         "hash",
         PerfisSistema.UsuarioId,
@@ -246,8 +246,8 @@ public sealed class TestesRenovacaoELogout
         public Task<bool> ExisteEmailAsync(string email, Guid? ignorarId, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorarId, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken token = default) => Task.FromResult(true);
-        public Task<bool> TentarAdicionarAsync(Usuario item, CancellationToken token = default) => Task.FromResult(true);
-        public Task AtualizarAsync(Usuario item, CancellationToken token = default) => Task.CompletedTask;
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 
     // Estado apenas em memória para testar a coordenação dos casos de uso; não simula concorrência SQL.

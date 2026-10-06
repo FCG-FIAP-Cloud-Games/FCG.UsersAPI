@@ -28,11 +28,11 @@ public sealed class TestesUsuarioEPerfil
         var usuario = CriarUsuario(PerfisSistema.UsuarioId);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => usuario.AtualizarDados(
-            "Nome alterado", Agora.AddYears(-21), new string('a', Usuario.TamanhoMaximoEmail + 1)));
+            "Nome alterado", DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-21), new string('a', Usuario.TamanhoMaximoEmail + 1)));
 
         Assert.Equal("Pessoa Exemplo", usuario.Nome);
         Assert.Equal("pessoa@exemplo.com", usuario.Email);
-        Assert.Equal(Agora.AddYears(-20), usuario.DataNascimento);
+        Assert.Equal(DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20), usuario.DataNascimento);
     }
 
     [Fact]
@@ -95,7 +95,46 @@ public sealed class TestesUsuarioEPerfil
             Agora.AddDays(7).ToOffset(TimeSpan.FromHours(fusoExpiracao))));
     }
 
+    [Theory]
+    [InlineData("1234567890")]
+    [InlineData("123456789012")]
+    [InlineData("123.456.789-00")]
+    [InlineData("１２３４５６７８９００")]
+    [InlineData("١٢٣٤٥٦٧٨٩٠٠")]
+    [InlineData("1234567890a")]
+    public void CriarUsuarioExigeCpfNormalizadoComOnzeDigitosAscii(string cpf)
+    {
+        var erro = Assert.Throws<ArgumentException>(() => new Usuario(
+            Guid.NewGuid(), "Pessoa Exemplo", cpf, new DateOnly(2000, 1, 1),
+            "pessoa@exemplo.com", "hash-sintetico", PerfisSistema.UsuarioId, Agora));
+
+        Assert.Equal("cpf", erro.ParamName);
+    }
+
+    [Fact]
+    public void CriarUsuarioSemNascimentoRejeitaEntrada()
+    {
+        var erro = Assert.Throws<ArgumentException>(() => new Usuario(
+            Guid.NewGuid(), "Pessoa Exemplo", "12345678900", default,
+            "pessoa@exemplo.com", "hash-sintetico", PerfisSistema.UsuarioId, Agora));
+
+        Assert.Equal("dataNascimento", erro.ParamName);
+    }
+
+    [Fact]
+    public void AtualizarUsuarioSemNascimentoPreservaDadosAnteriores()
+    {
+        var usuario = CriarUsuario(PerfisSistema.UsuarioId);
+        var nascimentoOriginal = usuario.DataNascimento;
+
+        Assert.Throws<ArgumentException>(() => usuario.AtualizarDados("Novo Nome", default, "novo@exemplo.com"));
+
+        Assert.Equal(nascimentoOriginal, usuario.DataNascimento);
+        Assert.Equal("Pessoa Exemplo", usuario.Nome);
+        Assert.Equal("pessoa@exemplo.com", usuario.Email);
+    }
+
     private static Usuario CriarUsuario(Guid perfilId) => new(
-        Guid.NewGuid(), "Pessoa Exemplo", "12345678900", Agora.AddYears(-20),
+        Guid.NewGuid(), "Pessoa Exemplo", "12345678900", DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20),
         "pessoa@exemplo.com", "hash-sintetico", perfilId, Agora.AddDays(-1));
 }
