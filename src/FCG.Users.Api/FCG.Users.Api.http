@@ -10,7 +10,7 @@ Accept: application/json
 
 ### Cadastro público de usuário comum (dados sintéticos, senha fictícia apenas para demonstração)
 # Requer banco configurado e migration aplicada. Não existe escolha de perfil nesta requisição.
-# Sucesso: 201, dados públicos e Location. GET nesse endereço será disponibilizado na E09.
+# Sucesso: 201, dados públicos e Location. GET nesse endereço exige JWT do titular ou administrador.
 # Repetir este exemplo no mesmo banco retorna 409. Para novo cadastro, altere CPF e e-mail.
 POST {{baseUrl}}/api/v1/usuarios
 Content-Type: application/json
@@ -73,3 +73,54 @@ Accept: application/json
 @accessToken = COLE_LOCALMENTE_O_ACCESS_TOKEN_VALIDO
 POST {{baseUrl}}/api/v1/auth/logout
 Authorization: Bearer {{accessToken}}
+
+
+### Consulta do próprio usuário ou de outro por administrador
+# 200 para autorizado, 401 sem JWT, 403 para acesso alheio de Usuario, 404 para alvo inexistente autorizado.
+@usuarioId = COLE_LOCALMENTE_O_GUID_DO_USUARIO
+GET {{baseUrl}}/api/v1/usuarios/{{usuarioId}}
+Authorization: Bearer {{accessToken}}
+
+### Atualização: titular ou administrador; CPF/senha/perfil/ativo não fazem parte deste contrato
+# 200 no sucesso; repetir os mesmos dados não duplica auditoria; 409 se e-mail de outra pessoa.
+PUT {{baseUrl}}/api/v1/usuarios/{{usuarioId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "nome": "Pessoa Exemplo Atualizada E09",
+  "dataNascimento": "2000-05-10",
+  "email": "pessoa.e06@example.test"
+}
+
+### Cadastro administrativo: somente Administrador; primeiro admin pelo roteiro local explícito
+# Dados e senha fictícios. Para repetir como novo cadastro, altere CPF/e-mail.
+@adminAccessToken = COLE_LOCALMENTE_O_ACCESS_DO_ADMINISTRADOR
+POST {{baseUrl}}/api/v1/usuarios/administradores
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "nome": "Administrador Exemplo E09",
+  "cpf": "987.654.321-00",
+  "dataNascimento": "2000-05-10",
+  "email": "admin.exemplo.e09@example.test",
+  "senha": "ExemploAdminDidatico#2026"
+}
+
+### Alteração de perfil: somente Administrador; novo token reflete perfil, antigo conserva as claims
+# Administrador: 22222222-2222-2222-2222-222222222222
+# Usuario: 11111111-1111-1111-1111-111111111111
+PUT {{baseUrl}}/api/v1/usuarios/{{usuarioId}}/perfil
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "perfilId": "22222222-2222-2222-2222-222222222222"
+}
+
+### Inativação: somente Administrador; 204 sem corpo, preserva usuário e histórico
+# Repetição mantém primeira data/log; login e refresh passam a 401.
+# Um access já emitido continua válido até expirar, com 30s de tolerância.
+DELETE {{baseUrl}}/api/v1/usuarios/{{usuarioId}}
+Authorization: Bearer {{adminAccessToken}}

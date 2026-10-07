@@ -1,3 +1,4 @@
+using FCG.Users.UnitTests.Support;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Abstractions.Security;
 using FCG.Users.Application.Auth;
@@ -71,7 +72,7 @@ public sealed class TestesManipuladorLogin
             new RepositorioTokensStub(),
             servicoHash,
             servicoJwt,
-            servicoRefresh);
+            servicoRefresh, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoLogin("usuario@exemplo.com", "Senha@123"),
@@ -139,7 +140,7 @@ public sealed class TestesManipuladorLogin
             repositorioTokens,
             servicoHash,
             servicoJwt,
-            servicoRefresh);
+            servicoRefresh, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoLogin("usuario@exemplo.com", "Senha@123"),
@@ -164,7 +165,7 @@ public sealed class TestesManipuladorLogin
             new RepositorioTokensStub(),
             servicoHash,
             servicoJwt,
-            servicoRefresh);
+            servicoRefresh, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoLogin("inexistente@exemplo.com", "Senha@123"),
@@ -187,7 +188,7 @@ public sealed class TestesManipuladorLogin
             new RepositorioTokensStub(),
             servicoHash,
             servicoJwt,
-            servicoRefresh);
+            servicoRefresh, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoLogin("usuario@exemplo.com", "Senha@Errada"),
@@ -228,7 +229,7 @@ public sealed class TestesManipuladorLogin
             repositorioTokens,
             new ServicoHashSenhaStub(),
             servicoJwt,
-            new ServicoRefreshTokenStub());
+            new ServicoRefreshTokenStub(), new UnidadeDeTrabalhoTeste());
 
     private sealed class RepositorioUsuariosStub : IRepositoryUsuarios
     {
@@ -257,7 +258,7 @@ public sealed class TestesManipuladorLogin
         public Task<UsuarioAutenticacao?> ObterAutenticacaoPorIdAsync(
             Guid id,
             CancellationToken tokenCancelamento = default) =>
-            Task.FromResult<UsuarioAutenticacao?>(null);
+            Task.FromResult(_usuario is null ? null : new UsuarioAutenticacao(_usuario, PerfisSistema.Usuario));
 
         public Task<Usuario?> ObterPorIdAsync(Guid id, CancellationToken tokenCancelamento = default) =>
             Task.FromResult<Usuario?>(null);
@@ -279,7 +280,7 @@ public sealed class TestesManipuladorLogin
             LogUsuario registroCadastro,
             CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
 
-        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, LogUsuario registroAuditoria, CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 
     private sealed class RepositorioTokensStub : IRepositorioTokens

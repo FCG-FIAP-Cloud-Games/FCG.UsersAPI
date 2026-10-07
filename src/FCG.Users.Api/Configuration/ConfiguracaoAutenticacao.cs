@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using FCG.Users.Domain.Entities;
@@ -11,7 +12,9 @@ internal static class ConfiguracaoAutenticacao
     public static IServiceCollection AdicionarAutenticacaoJwt(this IServiceCollection servicos)
     {
         servicos.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
-        servicos.AddAuthorization();
+        servicos.AddAuthorization(opcoes => opcoes.AddPolicy(PoliticasUsuarios.TitularOuAdministrador,
+            politica => politica.RequireAuthenticatedUser().AddRequirements(new RequisitoTitularOuAdministrador())));
+        servicos.AddSingleton<IAuthorizationHandler, AutorizacaoTitularOuAdministrador>();
         servicos.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<ChavesJwtRsa>((opcoes, chaves) =>
             {

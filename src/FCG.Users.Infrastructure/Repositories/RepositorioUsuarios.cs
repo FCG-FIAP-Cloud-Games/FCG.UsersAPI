@@ -65,6 +65,7 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
 
     public Task<ResultadoGravacaoUsuario> AtualizarAsync(
         Usuario usuario,
+        LogUsuario registroAuditoria,
         CancellationToken tokenCancelamento = default)
     {
         ArgumentNullException.ThrowIfNull(usuario);
@@ -72,9 +73,14 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
             throw new InvalidOperationException(
                 "Carregue o usuário com ObterPorIdAsync no mesmo repositório/contexto antes de atualizá-lo.");
 
+        ArgumentNullException.ThrowIfNull(registroAuditoria);
+        if (registroAuditoria.UsuarioId != usuario.Id)
+            throw new ArgumentException("A auditoria deve pertencer ao usuário alterado.", nameof(registroAuditoria));
+        contexto.LogsUsuarios.Add(registroAuditoria);
+
         // O rastreamento compara o estado original com o atual e grava somente os campos alterados.
         // Assim, editar nome/e-mail não sobrescreve uma inativação ou troca de perfil concorrente.
-        return SalvarAsync(usuario, tokenCancelamento);
+        return SalvarAsync(usuario, tokenCancelamento, registroAuditoria);
     }
 
     private IQueryable<UsuarioAutenticacao> ConsultarAutenticacao(IQueryable<Usuario> usuarios) =>
@@ -85,7 +91,7 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
     private async Task<ResultadoGravacaoUsuario> SalvarAsync(
         Usuario usuario,
         CancellationToken tokenCancelamento,
-        LogUsuario? registroCadastro = null)
+        LogUsuario? registroAuditoria = null)
     {
         try
         {
@@ -94,10 +100,10 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
         }
         catch (DbUpdateException exception)
         {
-            if (registroCadastro is not null)
+            if (registroAuditoria is not null)
             {
                 // O rollback desfaz o banco; desanexar evita repetir estas inclusões em outro SaveChanges.
-                contexto.Entry(registroCadastro).State = EntityState.Detached;
+                contexto.Entry(registroAuditoria).State = EntityState.Detached;
                 contexto.Entry(usuario).State = EntityState.Detached;
             }
 

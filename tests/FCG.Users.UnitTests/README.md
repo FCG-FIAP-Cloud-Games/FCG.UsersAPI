@@ -1,25 +1,22 @@
 # Testes unitários do UsersAPI
 
-Projeto xUnit 3, com Domain e Application. Revalidados na conclusão da E08, em 05/10/2026: **100 testes aprovados**.
+xUnit 3, Domain/Application. **106 aprovados em 06/10/2026**, zero falhas/ignorados.
 
-| Pasta | Conteúdo |
+| Grupo | Verifica |
 |---|---|
-| Domain | Usuário/perfil, CPF, nascimento civil, ciclo de token e quatro ações de auditoria. |
-| Usuarios | Cadastro, consulta, atualização, troca de perfil, limites, conflitos e coordenação da auditoria do cadastro. |
-| Auth | Coordenação de login, renovação e logout com dependências substitutas. |
+| Domain | Usuário/perfil, CPF/nascimento, token e quatro descrições de auditoria. |
+| Usuarios | Cadastro/consulta/dados/perfil/inativação; validações, conflitos, auditoria e idempotência. |
+| Auth | Coordenação de login/refresh/logout com substitutos. |
+| Support | Unidade de trabalho substituta, apenas para coordenação dos casos de uso. |
 
-Os substitutos privados ficam junto dos cenários. Relógios fixos permitem verificar expiração e nascimento futuro sem depender da data da máquina. Dados inválidos são rejeitados antes de consultar o repositório ou calcular hash.
+Seis novos cenários de inativação verificam usuário ativo/registro do mesmo alvo e instante, repetição sem log/data nova, GUID vazio, ausente e conflitos inesperados. Os testes de dados/perfil passaram a conferir a auditoria entregue ao repositório.
 
-Na E06, o repositório substituto recebe o par Usuario/LogUsuario. Os testes verificam que a aplicação envia a auditoria do usuário correto. Um relógio que avança a cada consulta comprova que cadastro e log recebem o mesmo instante capturado pelo caso de uso, sem depender de duas leituras coincidentes do relógio.
+Relógios controlados comprovam os instantes sem depender da data da execução. Substitutos não simulam a garantia de banco: transações, lock, atomicidade e concorrência são verificados no projeto IntegrationTests com PostgreSQL real.
 
-Na raiz, após compilar:
+Após compilar, na raiz:
 
 ```powershell
-dotnet test tests/FCG.Users.UnitTests --configuration Release --no-build --no-restore
+dotnet test tests/FCG.Users.UnitTests -c Release --no-build --no-restore
 ```
 
-Não exige Docker. Esses testes comprovam regras e coordenação. O projeto IntegrationTests verifica o hash concreto, o cadastro HTTP, as transações e a concorrência no PostgreSQL. Na E07, o projeto IntegrationTests também comprova login HTTP com PostgreSQL, JWT/RS256, configuração das chaves e autorização 401/403 usando controllers exclusivos de teste.
-
-Consulte o [guia E07](../../docs/aprendizado/E07-LOGIN-E-JWT-RS256.md) e as [evidências E07](../../docs/evidencias/E07/README.md). O [guia E06](../../docs/aprendizado/E06-CADASTRO-HTTP-E-AUDITORIA.md) e as [evidências](../../docs/evidencias/E06/README.md). O [guia E05](../../docs/aprendizado/E05-PERSISTENCIA-PROPRIA.md) preserva a explicação dos testes de persistência.
-
-E08: os mesmos 100 unitários reexecutados/aprovados. Comprovação HTTP/concorrência está nos 24 cenários reais de TestesSessaoHttp, sem repetir banco em novos mocks. Veja [guia E08](../../docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md) e [evidências](../../docs/evidencias/E08/README.md).
+Não exige Docker. [Guia E09](../../docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md) e [evidências](../../docs/evidencias/E09/README.md).

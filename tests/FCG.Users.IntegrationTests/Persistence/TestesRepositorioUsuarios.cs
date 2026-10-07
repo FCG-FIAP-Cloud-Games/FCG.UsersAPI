@@ -59,7 +59,7 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         Assert.NotNull(carregado);
         carregado.AlterarPerfil(PerfisSistema.AdministradorId);
         carregado.Inativar(DadosPersistencia.Agora);
-        Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await repositorio.AtualizarAsync(carregado, Cancelamento));
+        Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await repositorio.AtualizarAsync(carregado, LogUsuario.RegistrarAlteracaoDados(carregado.Id, DadosPersistencia.Agora), Cancelamento));
         var atualizado = await repositorio.ObterAutenticacaoPorIdAsync(usuario.Id, Cancelamento);
         Assert.NotNull(atualizado);
         Assert.Equal(PerfisSistema.Administrador, atualizado.Perfil);
@@ -119,7 +119,7 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
                 await new RepositorioUsuarios(outraSolicitacao).TentarAdicionarAsync(concorrente, LogUsuario.RegistrarCadastro(concorrente.Id, concorrente.CriadoEmUtc), Cancelamento));
         carregado.AtualizarDados("Nome alterado", carregado.DataNascimento, concorrente.Email);
         Assert.Equal(ResultadoGravacaoUsuario.ConflitoEmail,
-            await repositorio.AtualizarAsync(carregado, Cancelamento));
+            await repositorio.AtualizarAsync(carregado, LogUsuario.RegistrarAlteracaoDados(carregado.Id, DadosPersistencia.Agora), Cancelamento));
         await using var verificacao = banco.CriarContexto();
         var persistido = await verificacao.Usuarios.SingleAsync(item => item.Id == usuario.Id, Cancelamento);
         Assert.Equal(usuario.Email, persistido.Email);
@@ -141,9 +141,9 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         administrar.Inativar(DadosPersistencia.Agora);
         administrar.AlterarPerfil(PerfisSistema.AdministradorId);
         Assert.Equal(ResultadoGravacaoUsuario.Sucesso,
-            await administracao.AtualizarAsync(administrar, Cancelamento));
+            await administracao.AtualizarAsync(administrar, LogUsuario.RegistrarAlteracaoDados(administrar.Id, DadosPersistencia.Agora), Cancelamento));
         editar.AtualizarDados("Nome atualizado", editar.DataNascimento, editar.Email);
-        Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await edicao.AtualizarAsync(editar, Cancelamento));
+        Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await edicao.AtualizarAsync(editar, LogUsuario.RegistrarAlteracaoDados(editar.Id, DadosPersistencia.Agora), Cancelamento));
         await using var verificacao = banco.CriarContexto();
         var persistido = await verificacao.Usuarios.SingleAsync(item => item.Id == usuario.Id, Cancelamento);
         Assert.Equal("Nome atualizado", persistido.Nome);
@@ -158,6 +158,6 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         var usuario = await DadosPersistencia.GravarUsuarioAsync(banco);
         await using var contexto = banco.CriarContexto();
         var repositorio = new RepositorioUsuarios(contexto);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => repositorio.AtualizarAsync(usuario, Cancelamento));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repositorio.AtualizarAsync(usuario, LogUsuario.RegistrarAlteracaoDados(usuario.Id, DadosPersistencia.Agora), Cancelamento));
     }
 }

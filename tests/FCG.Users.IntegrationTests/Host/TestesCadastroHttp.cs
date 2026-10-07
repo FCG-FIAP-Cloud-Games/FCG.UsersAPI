@@ -241,8 +241,7 @@ public sealed class TestesCadastroHttp(BancoUsersFixture banco)
     [InlineData("GET", "/api/v1/usuarios")]
     [InlineData("PUT", "/api/v1/usuarios")]
     [InlineData("DELETE", "/api/v1/usuarios")]
-    [InlineData("GET", "/api/v1/usuarios/11111111-1111-1111-1111-111111111111")]
-    public async Task EntregaNaoExpoeConsultasOuEdicoesAntesDaE09(string metodo, string rota)
+    public async Task EntregaNaoExpoeListagemOuAlteracaoSemIdentificador(string metodo, string rota)
     {
         await using var fabrica = CriarFabrica();
         using var cliente = fabrica.CreateClient();

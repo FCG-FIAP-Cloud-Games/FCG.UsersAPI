@@ -8,13 +8,16 @@ public sealed class ManipuladorAtualizarUsuario
     private const int TamanhoMinimoNome = 3;
     private readonly IRepositoryUsuarios _repositorioUsuarios;
     private readonly TimeProvider _relogio;
+    private readonly IUnidadeDeTrabalhoUsuarios _unidadeDeTrabalho;
 
     public ManipuladorAtualizarUsuario(
         IRepositoryUsuarios repositorioUsuarios,
-        TimeProvider relogio)
+        TimeProvider relogio,
+        IUnidadeDeTrabalhoUsuarios unidadeDeTrabalho)
     {
         _repositorioUsuarios = repositorioUsuarios;
         _relogio = relogio;
+        _unidadeDeTrabalho = unidadeDeTrabalho;
     }
 
     public async Task<ResultadoAtualizarUsuario> ProcessarAsync(
@@ -31,22 +34,27 @@ public sealed class ManipuladorAtualizarUsuario
         if (erros.Count > 0)
             return ResultadoAtualizarUsuario.DadosInvalidos(erros);
 
-        var usuario = await _repositorioUsuarios.ObterPorIdAsync(comando.Id, tokenCancelamento);
-        if (usuario is null)
-            return ResultadoAtualizarUsuario.NaoEncontrado();
-
-        if (await _repositorioUsuarios.ExisteEmailAsync(email!, comando.Id, tokenCancelamento))
-            return ResultadoAtualizarUsuario.ConflitoEmail();
-
-        usuario.AtualizarDados(nome, dataNascimento, email!);
-        var gravacao = await _repositorioUsuarios.AtualizarAsync(usuario, tokenCancelamento);
-
-        return gravacao switch
+        return await _unidadeDeTrabalho.ExecutarAsync(comando.Id, async cancelamento =>
         {
-            ResultadoGravacaoUsuario.Sucesso => ResultadoAtualizarUsuario.Atualizado(DadosUsuario.De(usuario)),
-            ResultadoGravacaoUsuario.ConflitoEmail => ResultadoAtualizarUsuario.ConflitoEmail(),
-            _ => throw new InvalidOperationException("O repositório retornou um conflito inesperado ao atualizar dados sem alterar o CPF.")
-        };
+            var usuario = await _repositorioUsuarios.ObterPorIdAsync(comando.Id, cancelamento);
+            if (usuario is null)
+                return ResultadoAtualizarUsuario.NaoEncontrado();
+
+            if (await _repositorioUsuarios.ExisteEmailAsync(email!, comando.Id, cancelamento))
+                return ResultadoAtualizarUsuario.ConflitoEmail();
+
+            if (usuario.Nome == nome && usuario.DataNascimento == dataNascimento && usuario.Email == email)
+                return ResultadoAtualizarUsuario.Atualizado(DadosUsuario.De(usuario));
+            usuario.AtualizarDados(nome, dataNascimento, email!);
+            var gravacao = await _repositorioUsuarios.AtualizarAsync(usuario, LogUsuario.RegistrarAlteracaoDados(usuario.Id, _relogio.GetUtcNow()), cancelamento);
+
+            return gravacao switch
+            {
+                ResultadoGravacaoUsuario.Sucesso => ResultadoAtualizarUsuario.Atualizado(DadosUsuario.De(usuario)),
+                ResultadoGravacaoUsuario.ConflitoEmail => ResultadoAtualizarUsuario.ConflitoEmail(),
+                _ => throw new InvalidOperationException("O repositório retornou um conflito inesperado ao atualizar dados sem alterar o CPF.")
+            };
+        }, tokenCancelamento);
     }
 
     private static Dictionary<string, string[]> Validar(

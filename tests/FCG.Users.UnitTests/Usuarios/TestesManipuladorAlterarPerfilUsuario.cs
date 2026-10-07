@@ -1,3 +1,4 @@
+using FCG.Users.UnitTests.Support;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Usuarios;
 using FCG.Users.Domain.Entities;
@@ -14,7 +15,7 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
     {
         var usuario = CriarUsuario();
         var repositorio = new RepositorioStub(usuario);
-        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio);
+        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio, TimeProvider.System, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoAlterarPerfilUsuario(usuario.Id, PerfisSistema.AdministradorId),
@@ -23,6 +24,9 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         Assert.Equal(StatusAlteracaoPerfilUsuario.Atualizado, resultado.Status);
         Assert.Equal(PerfisSistema.AdministradorId, usuario.PerfilId);
         Assert.True(repositorio.Atualizado);
+        Assert.NotNull(repositorio.Auditoria);
+        Assert.Equal(usuario.Id, repositorio.Auditoria.UsuarioId);
+        Assert.Equal("Perfil do usuário alterado.", repositorio.Auditoria.Descricao);
     }
 
     [Fact]
@@ -30,7 +34,7 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
     {
         var usuario = CriarUsuario();
         var repositorio = new RepositorioStub(usuario) { PerfilExiste = false };
-        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio);
+        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio, TimeProvider.System, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoAlterarPerfilUsuario(usuario.Id, PerfisSistema.AdministradorId),
@@ -45,7 +49,7 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
     public async Task ProcessarComIdsVaziosRetornaDadosInvalidosSemConsultarRepositorio()
     {
         var repositorio = new RepositorioStub(null);
-        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio);
+        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio, TimeProvider.System, new UnidadeDeTrabalhoTeste());
 
         var resultado = await manipulador.ProcessarAsync(
             new ComandoAlterarPerfilUsuario(Guid.Empty, Guid.Empty),
@@ -64,7 +68,7 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
     {
         var usuario = CriarUsuario();
         var repositorio = new RepositorioStub(usuario) { ResultadoGravacao = gravacao };
-        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio);
+        var manipulador = new ManipuladorAlterarPerfilUsuario(repositorio, TimeProvider.System, new UnidadeDeTrabalhoTeste());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => manipulador.ProcessarAsync(
             new ComandoAlterarPerfilUsuario(usuario.Id, PerfisSistema.AdministradorId),
@@ -87,6 +91,7 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         public ResultadoGravacaoUsuario ResultadoGravacao { get; init; } = ResultadoGravacaoUsuario.Sucesso;
         public bool Consultado { get; private set; }
         public bool Atualizado { get; private set; }
+        public LogUsuario? Auditoria { get; private set; }
 
         public Task<Usuario?> ObterPorIdAsync(Guid id, CancellationToken token = default)
         {
@@ -97,9 +102,10 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken token = default) =>
             Task.FromResult(PerfilExiste);
 
-        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, CancellationToken token = default)
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, LogUsuario registroAuditoria, CancellationToken token = default)
         {
             Atualizado = true;
+            Auditoria = registroAuditoria;
             return Task.FromResult(ResultadoGravacao);
         }
 

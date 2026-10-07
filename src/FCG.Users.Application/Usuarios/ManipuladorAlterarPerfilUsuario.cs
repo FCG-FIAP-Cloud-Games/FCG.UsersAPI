@@ -1,3 +1,4 @@
+using FCG.Users.Domain.Entities;
 using FCG.Users.Application.Abstractions.Repositories;
 
 namespace FCG.Users.Application.Usuarios;
@@ -5,10 +6,15 @@ namespace FCG.Users.Application.Usuarios;
 public sealed class ManipuladorAlterarPerfilUsuario
 {
     private readonly IRepositoryUsuarios _repositorioUsuarios;
+    private readonly TimeProvider _relogio;
+    private readonly IUnidadeDeTrabalhoUsuarios _unidadeDeTrabalho;
 
-    public ManipuladorAlterarPerfilUsuario(IRepositoryUsuarios repositorioUsuarios)
+    public ManipuladorAlterarPerfilUsuario(IRepositoryUsuarios repositorioUsuarios, TimeProvider relogio,
+        IUnidadeDeTrabalhoUsuarios unidadeDeTrabalho)
     {
         _repositorioUsuarios = repositorioUsuarios;
+        _relogio = relogio;
+        _unidadeDeTrabalho = unidadeDeTrabalho;
     }
 
     public async Task<ResultadoAlterarPerfilUsuario> ProcessarAsync(
@@ -21,19 +27,24 @@ public sealed class ManipuladorAlterarPerfilUsuario
         if (erros.Count > 0)
             return ResultadoAlterarPerfilUsuario.DadosInvalidos(erros);
 
-        var usuario = await _repositorioUsuarios.ObterPorIdAsync(comando.Id, tokenCancelamento);
-        if (usuario is null)
-            return ResultadoAlterarPerfilUsuario.NaoEncontrado();
+        return await _unidadeDeTrabalho.ExecutarAsync(comando.Id, async cancelamento =>
+        {
+            var usuario = await _repositorioUsuarios.ObterPorIdAsync(comando.Id, cancelamento);
+            if (usuario is null)
+                return ResultadoAlterarPerfilUsuario.NaoEncontrado();
 
-        if (!await _repositorioUsuarios.PerfilExisteAsync(comando.PerfilId, tokenCancelamento))
-            return ResultadoAlterarPerfilUsuario.PerfilNaoEncontrado();
+            if (!await _repositorioUsuarios.PerfilExisteAsync(comando.PerfilId, cancelamento))
+                return ResultadoAlterarPerfilUsuario.PerfilNaoEncontrado();
 
-        usuario.AlterarPerfil(comando.PerfilId);
-        var gravacao = await _repositorioUsuarios.AtualizarAsync(usuario, tokenCancelamento);
-        if (gravacao != ResultadoGravacaoUsuario.Sucesso)
-            throw new InvalidOperationException("O repositório retornou um conflito inesperado ao alterar somente o perfil do usuário.");
+            if (usuario.PerfilId == comando.PerfilId)
+                return ResultadoAlterarPerfilUsuario.Atualizado(DadosUsuario.De(usuario));
+            usuario.AlterarPerfil(comando.PerfilId);
+            var gravacao = await _repositorioUsuarios.AtualizarAsync(usuario, LogUsuario.RegistrarTrocaPerfil(usuario.Id, _relogio.GetUtcNow()), cancelamento);
+            if (gravacao != ResultadoGravacaoUsuario.Sucesso)
+                throw new InvalidOperationException("O repositório retornou um conflito inesperado ao alterar somente o perfil do usuário.");
 
-        return ResultadoAlterarPerfilUsuario.Atualizado(DadosUsuario.De(usuario));
+            return ResultadoAlterarPerfilUsuario.Atualizado(DadosUsuario.De(usuario));
+        }, tokenCancelamento);
     }
 
     private static Dictionary<string, string[]> Validar(ComandoAlterarPerfilUsuario comando)

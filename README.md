@@ -1,29 +1,33 @@
 # FCG.UsersAPI
 
-Microsserviço de usuários e autenticação do FIAP Cloud Games, desenvolvido para o Tech Challenge Fase 2 em **.NET 8**.
+Microsserviço de usuários e autenticação do FIAP Cloud Games, Tech Challenge Fase 2, em **.NET 8**.
 
 ## Estado atual
 
-**E08 concluída localmente em 05/10/2026:** refresh HTTP com rotação transacional e logout de todas as sessões renováveis do próprio usuário. Perfil/atividade atuais são consultados; concorrência entre refresh e logout coordenada no PostgreSQL.
+**E10 concluída localmente em 06/10/2026:** contrato e topologia de UserCreatedEvent comprovados em oito cenários com RabbitMQ real e Notifications original. Publish comum retornou sucesso sem rota; confirms + mandatory detectaram NO_ROUTE e permitiram recuperação com mesmos IDs. [Guia E10](docs/aprendizado/E10-CONTRATO-E-PROVA-RABBITMQ.md), [contrato](docs/contratos/CONTRATO-USERCREATED-E-TOPOLOGIA.md) e [evidências](docs/evidencias/E10/README.md).
 
-**326 testes aprovados:** 100 unitários e 226 de integração/configuração/HTTP/segurança, executados em 05/10. Build Release sem erros/avisos e Kestrel real verificado. Consulte [evidências E08](docs/evidencias/E08/README.md).
+A prova usa a identidade atual da branch do colega e uma ferramenta separada. O cadastro ainda não publica nem registra Outbox; próximo passo **E11**, persistir usuário, auditoria e evento juntos. Restam **quatro entregas E11–E14**.
 
-O HTTP expõe saúde, cadastro, login, refresh e logout. Login/refresh devolvem access RS256 de 15 minutos, refresh com hash persistido/7 dias e usuario; nome/e-mail fora das claims. Logout revoga refreshs ativos; JWT emitido continua válido até expirar, com 30 segundos de tolerância.
+**Base E09 concluída localmente em 06/10/2026:** consulta/edição por titular ou administrador, cadastro administrativo, troca de perfil e inativação, com as quatro auditorias conectadas ao banco próprio. Alteração e auditoria são confirmadas juntas; administração e emissão de tokens do mesmo usuário são coordenadas no PostgreSQL.
 
-Branch atual: feature/c10-migrar-dominio, base 5ba69b3 de E02–E04. E05–E08 no diretório de trabalho, **sem commit ou push**. Nenhum card encerrado.
+**387 testes aprovados na E09, sem reexecução na E10:** 106 unitários e 281 de integração/configuração/HTTP/segurança. Release sem erros/avisos; Kestrel/PostgreSQL reais e validação JWT somente com pública demonstrados. Veja [guia E09](docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md) e [evidências](docs/evidencias/E09/README.md).
+
+Login/refresh devolvem access RS256 de 15 minutos, refresh por hash/7 dias e usuario. Nome/e-mail ficam fora das claims. Logout revoga sessões renováveis; perfil/inativação passam a valer em novas emissões. JWT anterior conserva suas claims até expirar, com tolerância de 30 segundos.
+
+Branch atual: `feature/c11-persistencia-migration`, base `5f438ea` (`C10`), que já contém o código anterior commitado por Matheus. E09/E10 locais, **sem commit/push**; docs/scripts restaurados também locais. Nenhum card encerrado.
 
 ## Pré-requisitos
 
-- Git e SDK .NET **8.0.423** ou patch compatível conforme `global.json`.
-- PowerShell **7 ou superior** para o roteiro local de geração/leitura de PEM.
-- Docker Desktop com engine Linux funcionando para banco local e testes PostgreSQL.
-- Acesso ao NuGet e, na primeira execução, às imagens usadas pelos testes.
+- Git e SDK .NET **8.0.423** ou patch compatível conforme global.json.
+- PowerShell **7.4+** para os roteiros locais.
+- Docker Desktop com engine Linux funcionando para PostgreSQL local e testes.
+- NuGet e imagens de teste disponíveis na primeira execução.
 
-RabbitMQ ainda não é necessário. O Docker pode precisar de diagnóstico se repetir o erro de endpoints observado nesta máquina; veja o [registro do ambiente](docs/evidencias/E05/AMBIENTE-DOCKER.md).
+A prova E10 utiliza um RabbitMQ descartável, preparado/encerrado pelo runner. A API de produção ainda não exige broker. O diagnóstico de Docker nesta máquina está nas [evidências E09](docs/evidencias/E09/README.md).
 
 ## Executar localmente
 
-Na raiz do repositório, no PowerShell:
+Na raiz do repositório, no mesmo PowerShell 7.4+:
 
 ```powershell
 dotnet tool restore
@@ -32,45 +36,65 @@ dotnet build FCG.Users.sln --configuration Release --no-restore
 .\scripts\Configurar-PostgresLocal.ps1
 .\scripts\Configurar-JwtLocal.ps1 -CriarChaves
 dotnet tool run dotnet-ef database update --project src/FCG.Users.Infrastructure --startup-project src/FCG.Users.Infrastructure --configuration Release --no-build
+.\scripts\Inicializar-AdministradorLocal.ps1 -CriarCredenciais
 dotnet run --project src/FCG.Users.Api --configuration Release --no-build --launch-profile http
 ```
 
-Mantenha os comandos no mesmo terminal. O script configura `ConnectionStrings__UsersDatabase` para aquela sessão. Ele cria/reutiliza `fcg-usersapi-postgres`, com volume próprio e acesso local em **127.0.0.1:55432**. A senha aleatória fica em `.env.usersdb`, ignorado pelo Git; não compartilhe esse arquivo. O banco do monólito não é utilizado.
+O PostgreSQL próprio usa `fcg-usersapi-postgres`, volume `fcg-usersapi-postgres-data` e **127.0.0.1:55432**. A senha aleatória fica em `.env.usersdb`, ignorado pelo Git. O script configura a conexão somente na sessão atual; o banco do monólito não é usado.
 
-O roteiro de JWT gera o primeiro par RSA somente com `-CriarChaves`; se ele já existe, reutiliza os mesmos arquivos. A privada fica fora do repositório, em `%LOCALAPPDATA%\FCG.UsersAPI\jwt\users-local-v1`. Nas próximas sessões use o script sem `-CriarChaves`. Só a pública deve ser distribuída ao Catalog.
+JWT: `-CriarChaves` cria o primeiro par explicitamente, sem substituir o existente. Nas próximas sessões, execute sem essa opção. A privada fica fora do repositório em `%LOCALAPPDATA%\FCG.UsersAPI\jwt\users-local-v1`; apenas a pública é distribuída ao Catalog. A API exige chaves válidas e não gera RSA silenciosamente.
 
-A API exige configuração válida da conexão e das chaves, mas não aplica migrations automaticamente. O perfil HTTP inicia em Development na porta **5088**. Encerre com `Ctrl+C`.
+Primeiro administrador: o roteiro gera dados sintéticos/senha aleatória em `.env.adminlocal`, JSON ignorado pelo Git e com acesso local restrito. Executa um modo CLI somente Development/loopback, sem iniciar HTTP e sem precisar de RSA. Se já existe qualquer administrador, não altera usuários/senhas. Nas próximas execuções, use sem `-CriarCredenciais`. Consulte o arquivo local para login manual, sem compartilhar seu conteúdo.
 
-| Endereço | Resultado esperado |
+A API não aplica migrations automaticamente. E06–E09 reutilizam o schema da E05. O perfil HTTP inicia em Development na porta **5088**; encerre com Ctrl+C.
+
+## Operações HTTP
+
+| Rota | Permissão e resultado principal |
 |---|---|
-| [GET /health](http://localhost:5088/health) | HTTP 200 e `{"status":"Healthy"}`. Confirma que o processo responde; não testa o banco. |
-| `POST /api/v1/usuarios` | 201 para cadastro válido; 400 para dados inválidos; 409 para CPF/e-mail duplicado. |
-| `POST /api/v1/auth/login` | Login: 200 no sucesso, 400 por entrada inválida e 401 por credenciais inválidas. Refresh/logout também estão conectados. |
-| POST /api/v1/auth/refresh | 200 com novo par; 400 por entrada inválida; 401 por sessão inválida/inativa; não exige access. |
-| POST /api/v1/auth/logout | Bearer obrigatório; 204 sem corpo, revoga todos os refreshs ativos do sub; 401 por access inválido. |
-| [Swagger UI](http://localhost:5088/swagger/index.html) | Documentação disponível em Development com Swagger habilitado. |
-| [OpenAPI JSON](http://localhost:5088/swagger/v1/swagger.json) | Descrição das rotas atuais. |
-| `/rota-inexistente` | HTTP 404 no formato Problem Details. |
+| GET /health | 200, confirma o processo; não testa banco/broker. |
+| POST /api/v1/usuarios | Público; impõe Usuario; 201/400/409. |
+| POST /api/v1/auth/login | Público; 200/400/401; access/refresh/usuario. |
+| POST /api/v1/auth/refresh | Público; 200/400/401; substitui o par e usa dados atuais. |
+| POST /api/v1/auth/logout | Bearer válido; revoga todos os refreshs ativos do sub; 204/401. |
+| GET /api/v1/usuarios/{id} | Titular ou Administrador; 200/400/401/403/404. |
+| PUT /api/v1/usuarios/{id} | Titular ou Administrador; nome/e-mail/nascimento; 200/400/401/403/404/409. |
+| POST /api/v1/usuarios/administradores | Administrador; impõe Administrador; 201/400/401/403/409. |
+| PUT /api/v1/usuarios/{id}/perfil | Administrador; perfil existente; 200/400/401/403/404. |
+| DELETE /api/v1/usuarios/{id} | Administrador; inativação lógica; 204/400/401/403/404. |
 
-Não há página inicial em `/`; um 404 é esperado. O Swagger continua indisponível fora de Development, mesmo com sua flag ligada.
+Falhas inesperadas retornam 500 genérico em Problem Details. O DTO de usuário não inclui CPF/nascimento/hash/senha/tokens. O cadastro fornece Location agora consultável com JWT autorizado. PUT/perfil idênticos e DELETE repetido não duplicam auditoria.
 
-Para experimentar o cadastro, use o Swagger ou os exemplos de [FCG.Users.Api.http](src/FCG.Users.Api/FCG.Users.Api.http). Envie nome, CPF, nascimento no formato `AAAA-MM-DD`, e-mail e senha. O cliente não escolhe perfil nem estado do usuário. A resposta 201 inclui os dados públicos do cadastro, sem senha ou hash, e um cabeçalho `Location`. A consulta GET desse endereço será implementada na E09; ainda retorna 404.
+Inativação preserva conta/histórico e bloqueia novos login/refresh. Access anterior ainda pode autorizar operações até expirar: sem blacklist central ou consulta ao banco em cada validação. Não há reativação, troca de senha ou proteção do último administrador neste escopo.
 
-E06–E08 reutilizam as tabelas criadas na E05 e não acrescentam migration. A API não registra o corpo do cadastro nos logs. O exemplo de senha no arquivo HTTP é fictício, destinado somente ao exercício local.
+[Swagger UI](http://localhost:5088/swagger/index.html) e [OpenAPI](http://localhost:5088/swagger/v1/swagger.json) ficam disponíveis somente em Development com a flag habilitada. A rota `/` não tem página inicial. Os exemplos sintéticos estão em [FCG.Users.Api.http](src/FCG.Users.Api/FCG.Users.Api.http); substitua os marcadores localmente e não versione tokens reais.
 
-Para repetir o ciclo completo, após banco/migration/chaves e build, execute `./scripts/Verificar-SessaoLocal.ps1` no PowerShell 7. Cria sua API, demonstra login/refresh/logout, verifica banco e encerra o host iniciado. A conta sintética e três refreshs revogados ficam no banco. Porta 5088 livre; use -Porta 5089 se necessário.
+## Demonstrações e contrato do Catalog
+
+Depois de banco/migration/RSA e build Release, com porta 5088 livre:
+
+```powershell
+.\scripts\Verificar-AdministracaoLocal.ps1
+# Alternativa de porta: -Porta 5089
+```
+
+O roteiro inicializa/reutiliza o primeiro administrador, inicia Kestrel oculto, demonstra permissões/edição/administração/inativação e consulta quatro auditorias no banco. Também valida JWT somente com a pública e recusa kid/audience incorretos. Encerra apenas a API que iniciou. Contas sintéticas/históricos permanecem no banco, incluindo o usuário demonstrado inativo; reexecutar cria novas contas sintéticas.
+
+[http-local.json](docs/evidencias/E09/http-local.json) registra os resultados sem credenciais; logs locais ficam em TestResults/E09. A demonstração anterior de sessão continua em `scripts/Verificar-SessaoLocal.ps1`.
+
+Para o responsável pelo C14/#57: [contrato JWT para Catalog](docs/contratos/CONTRATO-JWT-PARA-CATALOG.md), com configuração e exemplo .NET 8, e [validador público local](scripts/Validar-TokenComChavePublica.ps1). A prova pública passou; integrar o serviço Catalog real é uma validação conjunta ainda pendente.
 
 ## Testes
 
-Com a solução compilada e Docker funcionando:
+Com Release compilado e Docker funcionando:
 
 ```powershell
 dotnet test FCG.Users.sln --configuration Release --no-build --no-restore
 ```
 
-O Testcontainers cria e descarta um PostgreSQL de testes, com porta aleatória e dados sintéticos. Não é necessário iniciar a API ou preparar o banco local para essa suíte. O host básico usa conexão fictícia; cadastro/login/refresh/logout usam PostgreSQL real. A suíte verifica hash, JWT, perfil atual, rotação/logout concorrentes, isolamento por usuário e rollback de cadastro/auditoria e sucessor de refresh.
+O Testcontainers cria PostgreSQL 16 descartável em porta aleatória. Não usa volume de desenvolvimento, monólito ou chaves do usuário. Os testes comprovam regras, contratos, permissões, hash, JWT, transações, rollback de auditoria e concorrência entre emissão/administração/refresh/logout.
 
-Somente os unitários, sem Docker:
+Somente unitários, sem Docker:
 
 ```powershell
 dotnet test tests/FCG.Users.UnitTests --configuration Release --no-build --no-restore
@@ -80,14 +104,14 @@ dotnet test tests/FCG.Users.UnitTests --configuration Release --no-build --no-re
 
 | Projeto/pasta | Responsabilidade |
 |---|---|
-| Api | Host ASP.NET Core, controllers, contratos e configuração HTTP. |
-| Application | Casos de uso e interfaces de repositórios/segurança. |
-| Domain | Entidades e invariantes; sem dependências de banco. |
-| Infrastructure | Contexto, mapeamentos, migration, repositórios e implementações concretas de hash de senha. |
-| UnitTests | Regras e coordenação dos casos de uso, com substitutos. |
-| IntegrationTests | Host, ciclo de autenticação HTTP, configuração, hash e PostgreSQL real. |
-| scripts | Preparação de banco/chaves e demonstrações sem imprimir credenciais. |
-| docs | Guias, decisões, planejamento e evidências. |
+| Api | Host, controllers, DTOs, JWT/policies HTTP e modo CLI explícito. |
+| Application | Casos de uso e interfaces de persistência, segurança e unidade de trabalho. |
+| Domain | Entidades e invariantes independentes de banco. |
+| Infrastructure | Contexto/mappings/migration, repositórios, transações, hash e RSA. |
+| UnitTests | Regras e coordenação com substitutos. |
+| IntegrationTests | HTTP, segurança e PostgreSQL reais, incluindo concorrência/CLI. |
+| scripts | Preparação de banco/RSA/admin e demonstrações sem exibir credenciais. |
+| docs | Guias, planejamento, contratos e evidências. |
 
 ```mermaid
 flowchart LR
@@ -98,20 +122,29 @@ flowchart LR
     INF --> DOM
 ```
 
-Nenhum projeto depende de arquivos/assemblies do monólito. As versões estão em `Directory.Packages.props`; a ferramenta EF 8 local está em `.config/dotnet-tools.json`.
+Nenhum projeto depende do monólito. Versões centralizadas em Directory.Packages.props; ferramenta EF local em .config/dotnet-tools.json.
 
 ## Aprendizado e próximos passos
 
-- [Guia E08](docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md): renovação, logout, transação, concorrência e JWTs antigos.
-- [Evidências E08](docs/evidencias/E08/README.md).
-- [Guia didático da E07](docs/aprendizado/E07-LOGIN-E-JWT-RS256.md): login, access/refresh, assinatura, claims, chaves persistentes e exercícios.
-- [Evidências da E07](docs/evidencias/E07/README.md).
-- [Guia didático da E06](docs/aprendizado/E06-CADASTRO-HTTP-E-AUDITORIA.md): requisição, validação, hash, perfil padrão e auditoria atômica.
-- [Evidências da E06](docs/evidencias/E06/README.md).
-- [Guia didático da E05](docs/aprendizado/E05-PERSISTENCIA-PROPRIA.md): conceitos, decisões, concorrência, migrations e exercícios.
-- [Evidências da E05](docs/evidencias/E05/README.md).
-- [Índice dos guias anteriores](docs/README.md).
-- [Plano dos cards #52 a #55](docs/planejamento/PLANO-EXECUCAO-USERSAPI-CARDS-52-55.md).
-- [Modelagem e decisões](docs/planejamento/ANALISE-MODELAGEM-USERSAPI-E-DECISOES.md).
+- [E09 — Operações protegidas e auditoria](docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md), com exercícios e mapa dos arquivos.
+- [Evidências E09](docs/evidencias/E09/README.md).
+- [Contrato JWT para Catalog](docs/contratos/CONTRATO-JWT-PARA-CATALOG.md).
+- [E08 — Refresh/logout/concorrência](docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md).
+- [E07 — Login e JWT RS256](docs/aprendizado/E07-LOGIN-E-JWT-RS256.md).
+- [E06 — Cadastro e auditoria](docs/aprendizado/E06-CADASTRO-HTTP-E-AUDITORIA.md).
+- [E05 — Persistência própria](docs/aprendizado/E05-PERSISTENCIA-PROPRIA.md).
+- [Índice completo](docs/README.md).
+- [Plano #52–#55](docs/planejamento/PLANO-EXECUCAO-USERSAPI-CARDS-52-55.md).
+- [Modelagem/decisões](docs/planejamento/ANALISE-MODELAGEM-USERSAPI-E-DECISOES.md).
 
-Próxima entrega: **E09**, operações protegidas, administração e demais auditorias. Restam **6 entregas, E09–E14**, para concluir o plano dos quatro cards. Avançamos em pequenos entregáveis, sem prazo fixo.
+Próxima: **E10 — contrato e prova de mensageria**. Restam **cinco entregas, E10–E14**: contrato/prova, Outbox atômica, publicador, recuperação/concorrência e consolidação. Sem prazo fixo; avançamos em pequenos entregáveis conforme a disponibilidade de Matheus.
+
+## Prova de mensageria E10
+
+Use um clone isolado de Notifications no commit `78b512477298cb9b37dbfe38504030d9c3d09a51`, PowerShell 7.4+, Docker Linux e portas 5672/15672/5089 livres:
+
+```powershell
+.\scripts\Verificar-MensageriaE10.ps1 -NotificationsRepoPath 'C:\GIT\FCG.NotificationsAPI'
+```
+
+O caminho é ilustrativo. O roteiro compila o produtor de prova e a aplicação original por `.csproj`, provisiona vhost/topologia/credenciais locais e executa oito cenários. Resultado em `TestResults/E10/rabbitmq-real.json`; limpa apenas seus processos/container/volumes temporários. Não precisa iniciar UsersAPI, PostgreSQL ou configurar JWT. [Orientações para os cards de integração](docs/planejamento/ORIENTACOES-INTEGRACAO-USERCREATED-E10.md).
