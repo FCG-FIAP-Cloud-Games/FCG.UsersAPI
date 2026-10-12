@@ -42,7 +42,7 @@ public sealed class TestesManipuladorObterUsuario
     }
 
     private static Usuario CriarUsuario() => new(
-        Guid.NewGuid(), "Maria", "12345678900", DateTimeOffset.UtcNow.AddYears(-20),
+        Guid.NewGuid(), "Maria", "12345678900", DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime).AddYears(-20),
         "maria@exemplo.com", "hash", Guid.NewGuid(), DateTimeOffset.UtcNow);
 
     private sealed class RepositorioStub(Usuario? usuario) : IRepositoryUsuarios
@@ -55,7 +55,7 @@ public sealed class TestesManipuladorObterUsuario
         public Task<bool> ExisteEmailAsync(string email, Guid? ignorarId, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorarId, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken token = default) => Task.FromResult(true);
-        public Task<bool> TentarAdicionarAsync(Usuario item, CancellationToken token = default) => Task.FromResult(true);
-        public Task AtualizarAsync(Usuario item, CancellationToken token = default) => Task.CompletedTask;
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 }

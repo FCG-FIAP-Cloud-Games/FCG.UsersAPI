@@ -25,7 +25,7 @@ public sealed class ManipuladorAtualizarUsuario
 
         var nome = ManipuladorCriarUsuario.NormalizarNome(comando.Nome);
         var email = ManipuladorCriarUsuario.NormalizarEmail(comando.Email);
-        var dataNascimento = comando.DataNascimento.ToUniversalTime();
+        var dataNascimento = comando.DataNascimento;
         var erros = Validar(comando, nome, email, dataNascimento, _relogio.GetUtcNow());
 
         if (erros.Count > 0)
@@ -39,16 +39,21 @@ public sealed class ManipuladorAtualizarUsuario
             return ResultadoAtualizarUsuario.ConflitoEmail();
 
         usuario.AtualizarDados(nome, dataNascimento, email!);
-        await _repositorioUsuarios.AtualizarAsync(usuario, tokenCancelamento);
+        var gravacao = await _repositorioUsuarios.AtualizarAsync(usuario, tokenCancelamento);
 
-        return ResultadoAtualizarUsuario.Atualizado(DadosUsuario.De(usuario));
+        return gravacao switch
+        {
+            ResultadoGravacaoUsuario.Sucesso => ResultadoAtualizarUsuario.Atualizado(DadosUsuario.De(usuario)),
+            ResultadoGravacaoUsuario.ConflitoEmail => ResultadoAtualizarUsuario.ConflitoEmail(),
+            _ => throw new InvalidOperationException("O repositório retornou um conflito inesperado ao atualizar dados sem alterar o CPF.")
+        };
     }
 
     private static Dictionary<string, string[]> Validar(
         ComandoAtualizarUsuario comando,
         string nome,
         string? email,
-        DateTimeOffset dataNascimento,
+        DateOnly dataNascimento,
         DateTimeOffset agora)
     {
         var erros = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -59,7 +64,7 @@ public sealed class ManipuladorAtualizarUsuario
             erros["nome"] = [$"O nome deve conter entre {TamanhoMinimoNome} e {Usuario.TamanhoMaximoNome} caracteres."];
         if (email is null)
             erros["email"] = ["Informe um e-mail válido."];
-        if (comando.DataNascimento == default || dataNascimento > agora)
+        if (comando.DataNascimento == default || dataNascimento > DateOnly.FromDateTime(agora.UtcDateTime))
             erros["dataNascimento"] = ["Informe uma data de nascimento válida e não futura."];
         return erros;
     }

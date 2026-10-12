@@ -1,11 +1,9 @@
 # FCG.Users.Domain
 
-Camada dos conceitos e invariantes do UsersAPI. Não referencia outros projetos nem pacotes NuGet.
+Entidades e invariantes do UsersAPI, sem dependências de EF Core ou outros projetos.
 
-Na E04, recebeu Usuario, Perfil, PerfisSistema, Token e Permissao em `Entities/`. As regras da origem foram preservadas, com namespaces adaptados. Token representa o registro do refresh token, com hash, expiração e revogação.
+Na E05, o modelo contém Usuario, Perfil, PerfisSistema, Token e LogUsuario. Nascimento usa DateOnly; CPF interno exige 11 dígitos ASCII sem formatação. Permissao foi retirada por decisão aprovada; o controle de acesso permanece baseado em perfis Usuario/Administrador. Autorizacao/posse de jogos pertence a Catalog.
 
-Permissao permanece como classe enquanto o grupo define sua presença no modelo final; não há mapeamento ou banco nesta entrega. Autorizacao/posse de jogos não integra Users. LogUsuario aguarda o alinhamento de auditoria da E05.
+Token representa o registro do refresh token (hash, expiração e revogação). LogUsuario prepara cadastro, alteração de dados, troca de perfil e inativação com descrições fixas e data UTC. Criar a entidade não grava automaticamente o histórico: essa conexão será feita nos respectivos fluxos.
 
-Nascimento ainda usa DateTimeOffset e os limites de campos ainda são os da origem. Sua compatibilização com o PDF será feita antes da parte afetada da persistência, conforme as decisões de modelagem.
-
-Leia o [capítulo da E04](../../docs/aprendizado/E04-DOMINIO-E-CASOS-DE-USO.md) e o [mapa de extração](../../docs/planejamento/MAPA-EXTRACAO-IDENTITY-E04.md).
+Consulte o [guia E05](../../docs/aprendizado/E05-PERSISTENCIA-PROPRIA.md).

@@ -29,7 +29,9 @@ public sealed class ManipuladorAlterarPerfilUsuario
             return ResultadoAlterarPerfilUsuario.PerfilNaoEncontrado();
 
         usuario.AlterarPerfil(comando.PerfilId);
-        await _repositorioUsuarios.AtualizarAsync(usuario, tokenCancelamento);
+        var gravacao = await _repositorioUsuarios.AtualizarAsync(usuario, tokenCancelamento);
+        if (gravacao != ResultadoGravacaoUsuario.Sucesso)
+            throw new InvalidOperationException("O repositório retornou um conflito inesperado ao alterar somente o perfil do usuário.");
 
         return ResultadoAlterarPerfilUsuario.Atualizado(DadosUsuario.De(usuario));
     }

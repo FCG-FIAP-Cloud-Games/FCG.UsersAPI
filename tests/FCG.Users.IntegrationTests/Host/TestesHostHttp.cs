@@ -25,8 +25,37 @@ public sealed class TestesHostHttp
         Assert.Equal("Healthy", json.RootElement.GetProperty("status").GetString());
     }
 
+    [Theory]
+    [InlineData("Jwt:Signing:ActiveKeyId")]
+    [InlineData("Jwt:Signing:PrivateKeyPath")]
+    [InlineData("Jwt:Validation:Keys:0:PublicKeyPath")]
+    public void ConfiguracaoObrigatoriaJwtAusenteImpedeInicializacaoDoHost(string campo)
+    {
+        using var fabrica = new FabricaUsersApi(sobrescreverConfiguracao:
+            new Dictionary<string, string?> { [campo] = string.Empty });
+
+        var erro = Assert.Throws<InvalidOperationException>(() => fabrica.CreateClient());
+
+        Assert.Contains(campo, erro.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("BEGIN PRIVATE KEY", erro.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
-    public async Task SwaggerDocumentaOEndpointDeHealthEmDesenvolvimento()
+    public void ArquivoPrivadoInexistenteImpedeInicializacaoSemExporCaminho()
+    {
+        using var chaves = new ChavesJwtTeste();
+        var inexistente = Path.Combine(chaves.Pasta, "privada-inexistente.pem");
+        using var fabrica = new FabricaUsersApi(chaves: chaves, sobrescreverConfiguracao:
+            new Dictionary<string, string?> { ["Jwt:Signing:PrivateKeyPath"] = inexistente });
+
+        var erro = Assert.Throws<InvalidOperationException>(() => fabrica.CreateClient());
+
+        Assert.Contains("Jwt:Signing:PrivateKeyPath", erro.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(inexistente, erro.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SwaggerDocumentaRotasPublicasELogoutProtegidoEmDesenvolvimento()
     {
         await using var fabrica = new FabricaUsersApi();
         using var cliente = fabrica.CreateClient();
@@ -36,8 +65,32 @@ public sealed class TestesHostHttp
 
         Assert.Equal(HttpStatusCode.OK, resposta.StatusCode);
         Assert.Equal("FCG UsersAPI", json.RootElement.GetProperty("info").GetProperty("title").GetString());
+        var bearer = json.RootElement.GetProperty("components").GetProperty("securitySchemes").GetProperty("Bearer");
+        Assert.Equal("http", bearer.GetProperty("type").GetString());
+        Assert.Equal("bearer", bearer.GetProperty("scheme").GetString());
+        Assert.Equal("JWT", bearer.GetProperty("bearerFormat").GetString());
         var caminhos = json.RootElement.GetProperty("paths");
-        Assert.Single(caminhos.EnumerateObject());
+        Assert.Equal(5, caminhos.EnumerateObject().Count());
+        var refresh = caminhos.GetProperty("/api/v1/auth/refresh").GetProperty("post");
+        foreach (var codigo in new[] { "200", "400", "401", "500" })
+            Assert.True(refresh.GetProperty("responses").TryGetProperty(codigo, out _));
+        var logout = caminhos.GetProperty("/api/v1/auth/logout").GetProperty("post");
+        foreach (var codigo in new[] { "204", "401", "500" })
+            Assert.True(logout.GetProperty("responses").TryGetProperty(codigo, out _));
+        Assert.Single(logout.GetProperty("security").EnumerateArray());
+        Assert.Empty(logout.GetProperty("security")[0].GetProperty("Bearer").EnumerateArray());
+        foreach (var rotaPublica in new[] { "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/usuarios" })
+        {
+            var operacao = caminhos.GetProperty(rotaPublica).GetProperty("post");
+            Assert.True(!operacao.TryGetProperty("security", out var seguranca) || seguranca.GetArrayLength() == 0);
+        }
+        var login = caminhos.GetProperty("/api/v1/auth/login").GetProperty("post");
+        foreach (var codigo in new[] { "200", "400", "401", "500" })
+            Assert.True(login.GetProperty("responses").TryGetProperty(codigo, out _));
+        Assert.Single(caminhos.GetProperty("/api/v1/usuarios").EnumerateObject());
+        var cadastro = caminhos.GetProperty("/api/v1/usuarios").GetProperty("post");
+        foreach (var codigo in new[] { "201", "400", "409", "500" })
+            Assert.True(cadastro.GetProperty("responses").TryGetProperty(codigo, out _));
         var respostas = caminhos.GetProperty("/health").GetProperty("get").GetProperty("responses");
         Assert.True(respostas.TryGetProperty("200", out _));
         Assert.True(respostas.TryGetProperty("503", out _));

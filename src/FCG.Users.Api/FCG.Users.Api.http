@@ -8,6 +8,68 @@ Accept: application/json
 GET {{baseUrl}}/swagger/v1/swagger.json
 Accept: application/json
 
+### Cadastro público de usuário comum (dados sintéticos, senha fictícia apenas para demonstração)
+# Requer banco configurado e migration aplicada. Não existe escolha de perfil nesta requisição.
+# Sucesso: 201, dados públicos e Location. GET nesse endereço será disponibilizado na E09.
+# Repetir este exemplo no mesmo banco retorna 409. Para novo cadastro, altere CPF e e-mail.
+POST {{baseUrl}}/api/v1/usuarios
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "Pessoa Exemplo E06",
+  "cpf": "123.456.789-00",
+  "dataNascimento": "2000-05-10",
+  "email": "pessoa.e06@example.test",
+  "senha": "ExemploDidatico#2026"
+}
+
+### Cadastro inválido: 400 application/problem+json com erros por campo
+POST {{baseUrl}}/api/v1/usuarios
+Content-Type: application/json
+Accept: application/problem+json
+
+{
+  "nome": "A",
+  "cpf": "123",
+  "dataNascimento": "2000-05-10",
+  "email": "email-invalido",
+  "senha": "fraca"
+}
+
 ### Resposta padronizada para rota inexistente
 GET {{baseUrl}}/rota-inexistente
 Accept: application/problem+json
+
+### Login público: execute primeiro o cadastro de exemplo acima
+# Sucesso: 200 com accessToken (JWT RS256), refreshToken e dados básicos do usuário.
+# Credenciais incorretas ou conta inativa: 401 genérico. Dados inválidos: 400.
+# Não compartilhe tokens reais. Os valores de senha deste arquivo são fictícios.
+# Guarde o par recebido: a renovação substitui os dois valores.
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "pessoa.e06@example.test",
+  "senha": "ExemploDidatico#2026"
+}
+
+### Renovação pública: substitua pelo refresh mais recente recebido no login/refresh
+# O access token pode estar vencido: Authorization não é necessário aqui.
+# 200 devolve novo par; descarte o par antigo. Reutilizar o refresh antigo retorna 401.
+@refreshToken = COLE_LOCALMENTE_O_REFRESH_ATUAL
+POST {{baseUrl}}/api/v1/auth/refresh
+Content-Type: application/json
+Accept: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout de todas as sessões renováveis do próprio usuário
+# Sem corpo. 204 no sucesso; 401 se o access token faltar ou for inválido.
+# O refresh deixa de funcionar; JWT já emitido continua válido até expirar (+30s de tolerância).
+@accessToken = COLE_LOCALMENTE_O_ACCESS_TOKEN_VALIDO
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{accessToken}}

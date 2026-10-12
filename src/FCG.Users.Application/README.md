@@ -1,17 +1,15 @@
 # FCG.Users.Application
 
-Camada dos casos de uso de usuários e autenticação. Depende somente de Domain.
+Casos de uso de usuários/autenticação. Depende somente de Domain; declara interfaces sem ASP.NET Core, EF ou criptografia concreta.
 
-Na E04, recebeu comandos, resultados e manipuladores de cadastro, consulta, atualização, alteração de perfil, login, renovação e logout, além das abstrações de repositórios e segurança.
+- Usuarios: comandos/resultados e manipuladores de cadastro, consulta, atualização e troca de perfil.
+- Auth: login, refresh e logout.
+- Abstractions/Repositories: operações implementadas pela Infrastructure desde a E05.
+- Abstractions/Security: contratos implementados concretamente nas E06/E07.
+- NormalizadorIdentidade: normalização usada na autenticação.
 
-- `Usuarios/`: fluxos e dados de usuários.
-- `Auth/`: coordenação de login, refresh e logout.
-- `Abstractions/Repositories/`: operações de persistência necessárias; ainda sem implementação no novo serviço.
-- `Abstractions/Security/`: contratos de hash e emissão de tokens; ainda sem criptografia concreta.
-- `NormalizadorIdentidade.cs`: normalização usada pela autenticação.
+Na E08, os três fluxos de Auth estão conectados ao HTTP e PostgreSQL. Refresh rejeita sessão inválida/usuário inativo, consulta perfil atual, prepara credenciais e retorna o par só após rotação confirmada. Logout recebe identificador autenticado da borda HTTP e coordena revogação. API valida JWT/extrai sub; Infrastructure controla transações/concorrência.
 
-Os corpos dos métodos e contratos da origem foram preservados. O arquivo IRepositoryUsuarios.cs corresponde ao nome do tipo que já existia no monólito. A assinatura JWT RS256, o banco e a composição no host entram nas próximas entregas.
+E09 conectará consultas/administração e auditorias restantes. Substitutos ficam só nos testes; nenhuma persistência em memória foi registrada na API.
 
-Os testes usam substitutos definidos exclusivamente no projeto UnitTests. Nenhuma implementação em memória foi registrada na API. Autorizações por titularidade/role e perfil padrão do cadastro público serão conectados na borda HTTP, seguindo o comportamento de origem.
-
-Leia o [capítulo da E04](../../docs/aprendizado/E04-DOMINIO-E-CASOS-DE-USO.md) e o [mapa de extração](../../docs/planejamento/MAPA-EXTRACAO-IDENTITY-E04.md).
+Veja [guia E08](../../docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md) e [mapa da extração E04](../../docs/planejamento/MAPA-EXTRACAO-IDENTITY-E04.md).

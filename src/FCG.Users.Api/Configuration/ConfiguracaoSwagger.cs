@@ -17,6 +17,14 @@ internal static class ConfiguracaoSwagger
                 Version = NomeDocumento,
                 Description = "Microsserviço de usuários e autenticação do FIAP Cloud Games."
             });
+            opcoes.OperationFilter<SegurancaSwaggerOperationFilter>();
+            opcoes.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description = "Token de acesso emitido pelo login ou refresh. Logout exige Bearer; saúde, cadastro, login e refresh são públicos."
+            });
         });
 
         return servicos;
