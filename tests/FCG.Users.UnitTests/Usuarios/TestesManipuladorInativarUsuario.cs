@@ -1,3 +1,4 @@
+using FCG.Notifications.Application.Messaging.Contracts;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Usuarios;
 using FCG.Users.Domain.Entities;
@@ -80,6 +81,6 @@ public sealed class TestesManipuladorInativarUsuario
         public Task<bool> ExisteEmailAsync(string email, Guid? ignorar, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorar, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> PerfilExisteAsync(Guid perfil, CancellationToken token = default) => Task.FromResult(true);
-        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario log, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario log, UserCreatedEvent eventoCriacao, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 }

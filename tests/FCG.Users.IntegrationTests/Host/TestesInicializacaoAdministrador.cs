@@ -62,6 +62,7 @@ public sealed class TestesInicializacaoAdministrador
             await repetir.ServiceProvider.GetRequiredService<InicializadorAdministradorLocal>().ExecutarAsync(Comando() with { Senha = "OutraSenha#E09" }, Cancelamento));
         Assert.Equal(hashAnterior, (await contexto.Usuarios.AsNoTracking().SingleAsync(Cancelamento)).SenhaHash);
         Assert.Equal(1, await contexto.LogsUsuarios.CountAsync(Cancelamento));
+        Assert.Equal(1, await contexto.MensagensOutbox.CountAsync(Cancelamento));
     }
 
     [Fact]
@@ -78,6 +79,7 @@ public sealed class TestesInicializacaoAdministrador
             await Assert.ThrowsAsync<DbUpdateException>(() => escopo.ServiceProvider.GetRequiredService<InicializadorAdministradorLocal>().ExecutarAsync(Comando(), Cancelamento));
             Assert.False(await contexto.Usuarios.AnyAsync(Cancelamento));
             Assert.False(await contexto.LogsUsuarios.AnyAsync(Cancelamento));
+            Assert.False(await contexto.MensagensOutbox.AnyAsync(Cancelamento));
         }
         finally { await contexto.Database.ExecuteSqlRawAsync("ALTER TABLE \"tb_LogUsuarios\" DROP CONSTRAINT IF EXISTS \"CK_E09_FalhaBootstrap\"", CancellationToken.None); }
     }
@@ -105,6 +107,10 @@ public sealed class TestesInicializacaoAdministrador
         Assert.Equal(PerfisSistema.AdministradorId, usuario.PerfilId);
         Assert.True(new ServicoHashSenha().Verificar(comando.Senha, usuario.SenhaHash));
         Assert.Single(await contexto.LogsUsuarios.ToListAsync(Cancelamento));
+        var pendente = Assert.Single(await contexto.MensagensOutbox.ToListAsync(Cancelamento));
+        Assert.Equal(usuario.Id, pendente.UserId);
+        Assert.Null(pendente.PublishedAt);
+        Assert.Equal(0, pendente.Attempts);
     }
 
     private static async Task<(int Codigo, string Saida, string Erros)> ExecutarProgramaAsync(

@@ -26,7 +26,7 @@ public sealed class TestesAuditoriaCadastro(BancoUsersFixture banco)
         {
             var repositorio = new RepositorioUsuarios(contexto);
             var erro = await Assert.ThrowsAsync<DbUpdateException>(() =>
-                repositorio.TentarAdicionarAsync(usuario, log, Cancelamento));
+                repositorio.TentarAdicionarAsync(usuario, log, DadosPersistencia.EventoCriado(usuario), Cancelamento));
             var postgres = Assert.IsType<PostgresException>(erro.InnerException);
             Assert.Equal(PostgresErrorCodes.CheckViolation, postgres.SqlState);
             Assert.Equal("CK_E06_RejeitarCadastro", postgres.ConstraintName);
@@ -37,10 +37,12 @@ public sealed class TestesAuditoriaCadastro(BancoUsersFixture banco)
             await using var verificacao = banco.CriarContexto();
             Assert.False(await verificacao.Usuarios.AnyAsync(item => item.Id == usuario.Id, Cancelamento));
             Assert.False(await verificacao.LogsUsuarios.AnyAsync(item => item.UsuarioId == usuario.Id, Cancelamento));
+            Assert.False(await verificacao.MensagensOutbox.AnyAsync(item => item.UserId == usuario.Id, Cancelamento));
             var seguinte = DadosPersistencia.NovoUsuario();
             Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await repositorio.TentarAdicionarAsync(seguinte,
-                LogUsuario.RegistrarCadastro(seguinte.Id, seguinte.CriadoEmUtc), Cancelamento));
+                LogUsuario.RegistrarCadastro(seguinte.Id, seguinte.CriadoEmUtc), DadosPersistencia.EventoCriado(seguinte), Cancelamento));
             Assert.Equal(1, await verificacao.LogsUsuarios.CountAsync(item => item.UsuarioId == seguinte.Id, Cancelamento));
+            Assert.Equal(1, await verificacao.MensagensOutbox.CountAsync(item => item.UserId == seguinte.Id, Cancelamento));
         }
         finally
         {
@@ -56,7 +58,7 @@ public sealed class TestesAuditoriaCadastro(BancoUsersFixture banco)
         var logIncorreto = LogUsuario.RegistrarCadastro(Guid.NewGuid(), usuario.CriadoEmUtc);
         await using var contexto = banco.CriarContexto();
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            new RepositorioUsuarios(contexto).TentarAdicionarAsync(usuario, logIncorreto, Cancelamento));
+            new RepositorioUsuarios(contexto).TentarAdicionarAsync(usuario, logIncorreto, DadosPersistencia.EventoCriado(usuario), Cancelamento));
         Assert.False(await contexto.Usuarios.AnyAsync(item => item.Id == usuario.Id, Cancelamento));
         Assert.False(await contexto.LogsUsuarios.AnyAsync(item => item.Id == logIncorreto.Id, Cancelamento));
     }

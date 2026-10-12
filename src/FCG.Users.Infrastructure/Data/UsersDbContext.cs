@@ -1,11 +1,13 @@
 using FCG.Users.Domain.Entities;
 using FCG.Users.Infrastructure.Data.Mappings;
+using FCG.Users.Infrastructure.Data.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace FCG.Users.Infrastructure.Data;
 
 public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : DbContext(options)
 {
+    public DbSet<MensagemOutbox> MensagensOutbox => Set<MensagemOutbox>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Perfil> Perfis => Set<Perfil>();
     public DbSet<Token> Tokens => Set<Token>();
@@ -19,5 +21,6 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : D
         modelBuilder.ApplyConfiguration(new MapeamentoUsuario());
         modelBuilder.ApplyConfiguration(new MapeamentoToken());
         modelBuilder.ApplyConfiguration(new MapeamentoLogUsuario());
+        modelBuilder.ApplyConfiguration(new MapeamentoMensagemOutbox());
     }
 }

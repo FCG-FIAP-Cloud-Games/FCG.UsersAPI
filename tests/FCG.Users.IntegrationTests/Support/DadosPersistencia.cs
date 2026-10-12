@@ -1,3 +1,4 @@
+using FCG.Notifications.Application.Messaging.Contracts;
 using System.Globalization;
 using FCG.Users.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,10 @@ internal static class DadosPersistencia
 
     public static string ProximoCpf() =>
         Interlocked.Increment(ref _proximoCpf).ToString("D11", CultureInfo.InvariantCulture);
+
+    public static UserCreatedEvent EventoCriado(Usuario usuario, Guid? eventId = null, Guid? correlationId = null) =>
+        new(eventId ?? Guid.NewGuid(), correlationId ?? Guid.NewGuid(), usuario.CriadoEmUtc, 1,
+            usuario.Id, usuario.Nome, usuario.Email);
 
     public static Token NovoToken(Guid usuarioId, string? hash = null, DateTimeOffset? expiracao = null) =>
         new(Guid.NewGuid(), usuarioId, hash ?? Guid.NewGuid().ToString("N"),

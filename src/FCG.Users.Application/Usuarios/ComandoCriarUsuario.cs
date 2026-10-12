@@ -6,4 +6,5 @@ public sealed record ComandoCriarUsuario(
     DateOnly DataNascimento,
     string Email,
     string Senha,
-    Guid PerfilId);
+    Guid PerfilId,
+    Guid? CorrelationId = null);

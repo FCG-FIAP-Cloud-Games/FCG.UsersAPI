@@ -9,7 +9,7 @@ namespace FCG.Users.IntegrationTests.Persistence;
 public sealed class TestesEstruturaBanco(BancoUsersFixture banco)
 {
     private static readonly string[] TabelasEsperadas =
-        ["__EFMigrationsHistory", "tb_LogUsuarios", "tb_Perfil", "tb_Tokens", "tb_Usuarios"];
+        ["__EFMigrationsHistory", "tb_LogUsuarios", "tb_Outbox", "tb_Perfil", "tb_Tokens", "tb_Usuarios"];
     private static CancellationToken Cancelamento => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -22,7 +22,8 @@ public sealed class TestesEstruturaBanco(BancoUsersFixture banco)
 
         Assert.Equal(TabelasEsperadas,
             tabelas.Order(StringComparer.Ordinal));
-        Assert.Single(await contexto.Database.GetAppliedMigrationsAsync(Cancelamento));
+        Assert.Equal(2, (await contexto.Database.GetAppliedMigrationsAsync(Cancelamento)).Count());
+        Assert.False(contexto.Database.HasPendingModelChanges());
         Assert.Empty(await contexto.Database.GetPendingMigrationsAsync(Cancelamento));
         var perfis = await contexto.Perfis.ToDictionaryAsync(perfil => perfil.Id, perfil => perfil.Nome, Cancelamento);
         Assert.Equal(2, perfis.Count);

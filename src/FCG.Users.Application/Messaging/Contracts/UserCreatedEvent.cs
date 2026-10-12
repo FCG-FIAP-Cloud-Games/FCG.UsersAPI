@@ -1,4 +1,4 @@
-// Identidade preservada para a prova com Notifications, commit 78b5124.
+// Identidade de integração preservada conforme a prova E10 com Notifications, commit 78b5124.
 // Não há referência de projeto nem dependência binária da NotificationsAPI.
 namespace FCG.Notifications.Application.Messaging.Contracts;
 
