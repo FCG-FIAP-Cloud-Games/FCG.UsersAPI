@@ -11,19 +11,22 @@ public sealed class ManipuladorRenovarToken
     private readonly IServicoTokenJwt _servicoTokenJwt;
     private readonly IServicoRefreshToken _servicoRefreshToken;
     private readonly TimeProvider _relogio;
+    private readonly IUnidadeDeTrabalhoUsuarios _unidadeDeTrabalho;
 
     public ManipuladorRenovarToken(
         IRepositoryUsuarios repositorioUsuarios,
         IRepositorioTokens repositorioTokens,
         IServicoTokenJwt servicoTokenJwt,
         IServicoRefreshToken servicoRefreshToken,
-        TimeProvider relogio)
+        TimeProvider relogio,
+        IUnidadeDeTrabalhoUsuarios unidadeDeTrabalho)
     {
         _repositorioUsuarios = repositorioUsuarios;
         _repositorioTokens = repositorioTokens;
         _servicoTokenJwt = servicoTokenJwt;
         _servicoRefreshToken = servicoRefreshToken;
         _relogio = relogio;
+        _unidadeDeTrabalho = unidadeDeTrabalho;
     }
 
     public async Task<ResultadoRenovarToken> ProcessarAsync(
@@ -48,44 +51,47 @@ public sealed class ManipuladorRenovarToken
         if (tokenAtual is null || !tokenAtual.EstaAtivo(agora))
             return ResultadoRenovarToken.TokenInvalido();
 
-        var autenticacao = await _repositorioUsuarios.ObterAutenticacaoPorIdAsync(
-            tokenAtual.UsuarioId,
-            tokenCancelamento);
+        return await _unidadeDeTrabalho.ExecutarAsync(tokenAtual.UsuarioId, async cancelamento =>
+        {
+            var autenticacao = await _repositorioUsuarios.ObterAutenticacaoPorIdAsync(
+                tokenAtual.UsuarioId,
+                cancelamento);
 
-        if (autenticacao is null || !autenticacao.Usuario.Ativo)
-            return ResultadoRenovarToken.TokenInvalido();
+            if (autenticacao is null || !autenticacao.Usuario.Ativo)
+                return ResultadoRenovarToken.TokenInvalido();
 
-        var accessToken = _servicoTokenJwt.GerarToken(
-            autenticacao.Usuario,
-            autenticacao.Perfil);
-        var refreshToken = _servicoRefreshToken.GerarToken();
-        var novoToken = new Token(
-            Guid.NewGuid(),
-            autenticacao.Usuario.Id,
-            refreshToken.Hash,
-            refreshToken.CriadoEm,
-            refreshToken.ExpiraEm);
-
-        var rotacionado = await _repositorioTokens.TentarRotacionarAsync(
-            tokenHash,
-            novoToken,
-            agora,
-            tokenCancelamento);
-
-        if (!rotacionado)
-            return ResultadoRenovarToken.TokenInvalido();
-
-        return ResultadoRenovarToken.Renovado(new LoginRealizado(
-            accessToken.AccessToken,
-            refreshToken.Valor,
-            accessToken.TokenType,
-            accessToken.ExpiresIn,
-            accessToken.ExpiresAt,
-            new UsuarioLogado(
+            var accessToken = _servicoTokenJwt.GerarToken(
+                autenticacao.Usuario,
+                autenticacao.Perfil);
+            var refreshToken = _servicoRefreshToken.GerarToken();
+            var novoToken = new Token(
+                Guid.NewGuid(),
                 autenticacao.Usuario.Id,
-                autenticacao.Usuario.Nome,
-                autenticacao.Usuario.Email,
-                autenticacao.Usuario.PerfilId,
-                autenticacao.Perfil)));
+                refreshToken.Hash,
+                refreshToken.CriadoEm,
+                refreshToken.ExpiraEm);
+
+            var rotacionado = await _repositorioTokens.TentarRotacionarAsync(
+                tokenHash,
+                novoToken,
+                _relogio.GetUtcNow(),
+                cancelamento);
+
+            if (!rotacionado)
+                return ResultadoRenovarToken.TokenInvalido();
+
+            return ResultadoRenovarToken.Renovado(new LoginRealizado(
+                accessToken.AccessToken,
+                refreshToken.Valor,
+                accessToken.TokenType,
+                accessToken.ExpiresIn,
+                accessToken.ExpiresAt,
+                new UsuarioLogado(
+                    autenticacao.Usuario.Id,
+                    autenticacao.Usuario.Nome,
+                    autenticacao.Usuario.Email,
+                    autenticacao.Usuario.PerfilId,
+                    autenticacao.Perfil)));
+        }, tokenCancelamento);
     }
 }

@@ -11,19 +11,22 @@ public sealed class ManipuladorLogin
     private readonly IServicoHashSenha _servicoHashSenha;
     private readonly IServicoTokenJwt _servicoTokenJwt;
     private readonly IServicoRefreshToken _servicoRefreshToken;
+    private readonly IUnidadeDeTrabalhoUsuarios _unidadeDeTrabalho;
 
     public ManipuladorLogin(
         IRepositoryUsuarios repositorioUsuarios,
         IRepositorioTokens repositorioTokens,
         IServicoHashSenha servicoHashSenha,
         IServicoTokenJwt servicoTokenJwt,
-        IServicoRefreshToken servicoRefreshToken)
+        IServicoRefreshToken servicoRefreshToken,
+        IUnidadeDeTrabalhoUsuarios unidadeDeTrabalho)
     {
         _repositorioUsuarios = repositorioUsuarios;
         _repositorioTokens = repositorioTokens;
         _servicoHashSenha = servicoHashSenha;
         _servicoTokenJwt = servicoTokenJwt;
         _servicoRefreshToken = servicoRefreshToken;
+        _unidadeDeTrabalho = unidadeDeTrabalho;
     }
 
     public async Task<ResultadoLogin> ProcessarAsync(
@@ -49,32 +52,41 @@ public sealed class ManipuladorLogin
             return ResultadoLogin.CredenciaisInvalidas();
         }
 
-        var accessToken = _servicoTokenJwt.GerarToken(
-            autenticacao.Usuario,
-            autenticacao.Perfil);
-        var refreshToken = _servicoRefreshToken.GerarToken();
+        return await _unidadeDeTrabalho.ExecutarAsync(autenticacao.Usuario.Id, async cancelamento =>
+        {
+            var atual = await _repositorioUsuarios.ObterAutenticacaoPorIdAsync(autenticacao.Usuario.Id, cancelamento);
+            if (atual is null || !atual.Usuario.Ativo || atual.Usuario.Email != emailNormalizado
+                || (atual.Usuario.SenhaHash != autenticacao.Usuario.SenhaHash
+                    && !_servicoHashSenha.Verificar(comando.Senha, atual.Usuario.SenhaHash)))
+                return ResultadoLogin.CredenciaisInvalidas();
 
-        var tokenPersistido = new Token(
-            Guid.NewGuid(),
-            autenticacao.Usuario.Id,
-            refreshToken.Hash,
-            refreshToken.CriadoEm,
-            refreshToken.ExpiraEm);
+            var accessToken = _servicoTokenJwt.GerarToken(
+                atual.Usuario,
+                atual.Perfil);
+            var refreshToken = _servicoRefreshToken.GerarToken();
 
-        await _repositorioTokens.AdicionarAsync(tokenPersistido, tokenCancelamento);
+            var tokenPersistido = new Token(
+                Guid.NewGuid(),
+                atual.Usuario.Id,
+                refreshToken.Hash,
+                refreshToken.CriadoEm,
+                refreshToken.ExpiraEm);
 
-        return ResultadoLogin.Autenticado(new LoginRealizado(
-            accessToken.AccessToken,
-            refreshToken.Valor,
-            accessToken.TokenType,
-            accessToken.ExpiresIn,
-            accessToken.ExpiresAt,
-            new UsuarioLogado(
-                autenticacao.Usuario.Id,
-                autenticacao.Usuario.Nome,
-                autenticacao.Usuario.Email,
-                autenticacao.Usuario.PerfilId,
-                autenticacao.Perfil)));
+            await _repositorioTokens.AdicionarAsync(tokenPersistido, cancelamento);
+
+            return ResultadoLogin.Autenticado(new LoginRealizado(
+                accessToken.AccessToken,
+                refreshToken.Valor,
+                accessToken.TokenType,
+                accessToken.ExpiresIn,
+                accessToken.ExpiresAt,
+                new UsuarioLogado(
+                    atual.Usuario.Id,
+                    atual.Usuario.Nome,
+                    atual.Usuario.Email,
+                    atual.Usuario.PerfilId,
+                    atual.Perfil)));
+        }, tokenCancelamento);
     }
 
     private static Dictionary<string, string[]> Validar(

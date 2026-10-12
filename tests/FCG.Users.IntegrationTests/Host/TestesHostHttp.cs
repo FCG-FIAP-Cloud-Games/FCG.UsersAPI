@@ -70,7 +70,12 @@ public sealed class TestesHostHttp
         Assert.Equal("bearer", bearer.GetProperty("scheme").GetString());
         Assert.Equal("JWT", bearer.GetProperty("bearerFormat").GetString());
         var caminhos = json.RootElement.GetProperty("paths");
-        Assert.Equal(5, caminhos.EnumerateObject().Count());
+        Assert.Equal(8, caminhos.EnumerateObject().Count());
+        var recurso = caminhos.GetProperty("/api/v1/usuarios/{id}");
+        foreach (var metodo in new[] { "get", "put", "delete" })
+            Assert.Single(recurso.GetProperty(metodo).GetProperty("security").EnumerateArray());
+        Assert.Single(caminhos.GetProperty("/api/v1/usuarios/{id}/perfil").GetProperty("put").GetProperty("security").EnumerateArray());
+        Assert.Single(caminhos.GetProperty("/api/v1/usuarios/administradores").GetProperty("post").GetProperty("security").EnumerateArray());
         var refresh = caminhos.GetProperty("/api/v1/auth/refresh").GetProperty("post");
         foreach (var codigo in new[] { "200", "400", "401", "500" })
             Assert.True(refresh.GetProperty("responses").TryGetProperty(codigo, out _));

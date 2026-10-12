@@ -22,7 +22,7 @@ public interface IRepositoryUsuarios
         CancellationToken tokenCancelamento = default);
     // Atualize a entidade obtida por ObterPorIdAsync na mesma unidade de trabalho.
     // A implementação persiste somente as propriedades modificadas.
-    Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, CancellationToken tokenCancelamento = default);
+    Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, LogUsuario registroAuditoria, CancellationToken tokenCancelamento = default);
 }
 
 public sealed record UsuarioAutenticacao(Usuario Usuario, string Perfil);

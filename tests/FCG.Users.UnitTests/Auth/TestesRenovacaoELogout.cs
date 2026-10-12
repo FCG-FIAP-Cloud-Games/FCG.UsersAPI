@@ -1,3 +1,4 @@
+using FCG.Users.UnitTests.Support;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Abstractions.Security;
 using FCG.Users.Application.Auth;
@@ -211,7 +212,7 @@ public sealed class TestesRenovacaoELogout
             repositorioTokens,
             servicoJwt ?? new ServicoTokenJwtStub(),
             new ServicoRefreshTokenStub(),
-            new RelogioFixo(Agora));
+            new RelogioFixo(Agora), new UnidadeDeTrabalhoTeste());
 
     private static Usuario CriarUsuario() => new(
         Guid.NewGuid(),
@@ -247,7 +248,7 @@ public sealed class TestesRenovacaoELogout
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorarId, CancellationToken token = default) => Task.FromResult(false);
         public Task<bool> PerfilExisteAsync(Guid perfilId, CancellationToken token = default) => Task.FromResult(true);
         public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
-        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario item, LogUsuario registroAuditoria, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 
     // Estado apenas em memória para testar a coordenação dos casos de uso; não simula concorrência SQL.

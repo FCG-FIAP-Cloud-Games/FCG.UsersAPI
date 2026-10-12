@@ -1,19 +1,19 @@
 # FCG.Users.Api
 
-Host ASP.NET Core do UsersAPI. Na E08, expõe saúde, cadastro, login, refresh e logout, com Problem Details e Swagger em Development.
+Host ASP.NET Core do UsersAPI. **E09 concluída em 06/10/2026.** Rotas descritas no [README principal](../../README.md) e nos [exemplos HTTP](FCG.Users.Api.http).
 
-| Rota | Comportamento |
-|---|---|
-| GET /health | Confere processo, sem banco/broker. |
-| POST /api/v1/usuarios | Cadastro comum, hash e auditoria atômica; 201/400/409. |
-| POST /api/v1/auth/login | JWT RS256 e refresh por hash; 200/400/401. |
-| POST /api/v1/auth/refresh | Público; confere sessão e devolve novo par/dados atuais; 200/400/401. |
-| POST /api/v1/auth/logout | Bearer válido; sub identifica dono das sessões a revogar; 204/401. |
+- Saúde, cadastro público, login e refresh são públicos.
+- Logout exige Bearer e usa sub como dono das sessões; não aceita usuário escolhido no corpo.
+- GET/PUT de usuário exigem titular ou Administrador, usando policy por GUID antes da consulta.
+- Cadastro de administradores, troca de perfil e inativação exigem role Administrador.
+- Cadastro público impõe Usuario; administrativo impõe Administrador. Campos extras não elevam privilégios.
 
-Falhas inesperadas retornam 500 genérico. Login/refresh mantêm usuario com nome/e-mail/perfil fora das claims. As ações usam no-store/no-cache. Refresh inválido, vencido, revogado ou usuário inativo recebe o mesmo 401.
+JWT é validado antes da autorização, com MapInboundClaims=false, sub/role preservados e kid confiável. Middleware Authentication precede Authorization. Falhas retornam Problem Details: 401/403/404/400/409 ou 500 genérico conforme o caso.
 
-Program registra serviços/casos de uso reais, exige chaves válidas no startup e aplica Authentication antes de Authorization. O logout não aceita escolha de usuário no corpo: usa JWT validado. SegurancaSwaggerOperationFilter declara Bearer apenas nas operações protegidas; o requisito visual não substitui o middleware.
+O DTO de usuário tem sete campos, sem CPF/nascimento/hash/senha/tokens. Controllers usam no-store/no-cache. Swagger fica em Development; seu filtro declara Bearer somente nas operações protegidas. A documentação visual não substitui policies/middleware.
 
-Sem migration automática ou geração silenciosa de RSA. Consultas/administração e demais auditorias entram na E09. Logout não invalida imediatamente access emitido. Controllers protegidos de demonstração existem só nos testes.
+Program também possui o modo explícito `--inicializar-admin-local`, restrito a Development/banco loopback. Esse ramo registra apenas cadastro/persistência/hash/inicializador, não inicia Kestrel nem exige RSA. A inicialização HTTP normal exige chaves válidas. Sem migrations automáticas ou geração silenciosa de RSA.
 
-Veja [guia E08](../../docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md), [evidências](../../docs/evidencias/E08/README.md) e [README principal](../../README.md).
+Access anterior conserva claims até expiração +30s, inclusive após perfil/inativação/logout. As operações não consultam o banco para revogação imediata.
+
+[Guia E09](../../docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md), [evidências](../../docs/evidencias/E09/README.md) e [contrato para Catalog](../../docs/contratos/CONTRATO-JWT-PARA-CATALOG.md).

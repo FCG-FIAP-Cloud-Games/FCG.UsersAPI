@@ -1,41 +1,40 @@
 # Testes de integração do UsersAPI
 
-Na E08: **226 testes aprovados**, zero falhas/ignorados. Execução em 05/10/2026, com 24 novos cenários HTTP de sessão.
+**281 aprovados em 06/10/2026**, zero falhas/ignorados. Resultado atual da E09, com hash/JWT/configuração, HTTP e PostgreSQL reais.
 
-| Classe | Cenários executados |
+| Classe | Casos |
 |---|---:|
+| TestesAdministracaoHttp | 39 |
 | TestesAuditoriaCadastro | 2 |
 | TestesAutorizacaoJwtHttp | 39 |
-| TestesCadastroHttp | 23 |
+| TestesCadastroHttp | 22 |
+| TestesConcorrenciaAdministracao | 8 |
 | TestesConfiguracaoJwt | 38 |
 | TestesConfiguracaoPersistencia | 6 |
 | TestesEstruturaBanco | 12 |
 | TestesHashSenha | 17 |
 | TestesHostHttp | 19 |
+| TestesInicializacaoAdministrador | 9 |
 | TestesLoginHttp | 19 |
 | TestesRepositorioTokens | 8 |
 | TestesRepositorioUsuarios | 7 |
 | TestesServicosTokens | 12 |
 | TestesSessaoHttp | 24 |
 
-O host básico usa conexão fictícia; cadastro/login/refresh/logout/persistência usam PostgreSQL 16 real descartável por Testcontainers, com migration própria, porta e senha de teste. Não usamos o banco do monólito, o volume de desenvolvimento ou as chaves privadas do usuário.
+Testcontainers cria PostgreSQL 16-alpine descartável com migration própria, porta aleatória e dados sintéticos. Não usa monólito, volume de desenvolvimento ou PEMs do usuário. Factories têm chaves temporárias de teste. Controllers __testes/e07 são carregados apenas nas factories que os solicitam; ausência no host normal continua verificada.
 
-Todas as factories usam PEM temporário exclusivo dos testes. A configuração chega antes do entry point; chaves são descartadas após encerrar a factory. Helpers que excluem arquivos removem somente o que criaram, sem exclusão recursiva arbitrária. As rotas protegidas __testes/e07 são carregadas somente quando a factory as solicita, e sua ausência no host normal é testada.
+TestesAdministracaoHttp verifica titular/admin, 401/403/404/400/409, DTO seguro, campos extras ignorados, cadastro administrativo, perfil novo no refresh, inativação idempotente e rollback de três auditorias. Falhas são induzidas apenas nos bancos descartáveis e restrições temporárias removidas em finally.
 
-A suíte demonstra login com PBKDF2/Identity e perfis Usuario/Administrador, preservação da resposta, claims mínimos, assinatura pública independente, refresh hash-only/7 dias, 401 genérico e erros sem segredos. Configuração inválida, chaves fracas/malformadas/incompatíveis, kid duplicado e PEM privado usado como público são recusados.
+TestesConcorrenciaAdministracao cobre dados atuais na emissão: perfil/inativação × login/refresh × duas ordens. Interceptadores pausam comandos com o lock retido; pg_stat_activity comprova espera no bloqueio FOR UPDATE. Depois confirma status, role, banco e auditoria.
 
-Middleware: assinatura/algoritmo/issuer/audience/prazo/kid/identidade inválidos retornam 401; Usuario em rota administrativa retorna 403. Reinício com o mesmo PEM preserva a validade; públicas antiga/nova coexistem até retirada; skew temporal é verificado.
+TestesInicializacaoAdministrador verifica guardas de ambiente/banco, duas inicializações concorrentes, senha preservada e rollback de cadastro/log. O subprocesso também executa o Program real duas vezes sem JWT/HTTP. Há nove casos nesta classe.
 
-Falhas reais de cadastro/auditoria e persistência do refresh são induzidas somente no banco descartável. Estruturas temporárias são removidas em finally. Logs são capturados incluindo exceções completas; senha, tokens, hashes e dados sintéticos não podem aparecer nos cenários que verificam isso. O rollback e os índices únicos não são substituídos por mocks.
+Regressões E07/E08 preservadas: hashes PBKDF2/Identity, JWT somente RS256, kid/issuer/audience/prazo/identidade, públicas coexistentes/reinício/skew, refresh por hash, rotação/replay/logout, falha de persistência e duas ordens de logout/refresh. Access anterior conserva validade conforme contrato.
 
-Para executar com Docker funcionando:
+Na raiz, após Release e com Docker funcionando:
 
 ```powershell
-dotnet test tests/FCG.Users.IntegrationTests/FCG.Users.IntegrationTests.csproj -c Release --logger "trx;LogFileName=e08-integracao.trx" --results-directory TestResults/E08
+dotnet test tests/FCG.Users.IntegrationTests -c Release --no-build --no-restore --logger 'trx;LogFileName=e09-integracao-final-2026-10-06.trx' --results-directory TestResults/E09
 ```
 
-TRX aprovado: TestResults/E08/e08-integracao-final-2026-10-05.trx. O [registro E08](../../docs/evidencias/E08/README.md) inclui os 100 unitários e o ciclo Kestrel real.
-
-TestesSessaoHttp verifica rotação/replay, expiração exata, inativação, perfil/dados atuais, duas renovações, logout de todas as sessões por sub, isolamento de outro usuário e JWT antigo ainda válido. Falha real prova rollback. Interceptador só de testes pausa primeira revogação e pg_stat_activity comprova espera em FOR UPDATE: refresh primeiro e logout primeiro, sem deixar sessão renovável.
-
-Dois cenários antigos exigiam ausência de refresh/logout e foram retirados: 204 − 2 + 24 = 226. Não depende de RabbitMQ nesta entrega.
+E09: `226 - 1 teste antigo de GET ausente + 39 administração + 8 concorrência + 9 inicialização = 281`. O [registro E09](../../docs/evidencias/E09/README.md) reúne 106 unitários, estes 281 casos e a demonstração Kestrel real. Ainda não depende de RabbitMQ.

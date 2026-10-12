@@ -284,7 +284,7 @@ public sealed class TestesManipuladorCriarUsuario
             TokenCancelamentoRecebido = token;
             return Task.FromResult(ResultadoGravacao);
         }
-        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, LogUsuario registroAuditoria, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 
     private sealed class HashSenhaStub : IHashSenha

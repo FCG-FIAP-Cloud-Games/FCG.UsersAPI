@@ -1,15 +1,17 @@
 # FCG.Users.Application
 
-Casos de uso de usuários/autenticação. Depende somente de Domain; declara interfaces sem ASP.NET Core, EF ou criptografia concreta.
+Casos de uso de usuários/autenticação. Depende somente de Domain; declara interfaces sem ASP.NET Core, EF ou criptografia concreta. **E09 concluída em 06/10/2026.**
 
-- Usuarios: comandos/resultados e manipuladores de cadastro, consulta, atualização e troca de perfil.
-- Auth: login, refresh e logout.
-- Abstractions/Repositories: operações implementadas pela Infrastructure desde a E05.
-- Abstractions/Security: contratos implementados concretamente nas E06/E07.
-- NormalizadorIdentidade: normalização usada na autenticação.
+- Usuarios: cadastro, consulta, atualização de dados, troca de perfil e inativação, com comandos/resultados próprios.
+- Auth: login, refresh e logout conectados ao HTTP/banco real.
+- Abstractions/Repositories: usuários, tokens e unidade de trabalho por usuário.
+- Abstractions/Security: contratos de hash/JWT/refresh.
+- NormalizadorIdentidade: regras usadas para entrada e identidade.
 
-Na E08, os três fluxos de Auth estão conectados ao HTTP e PostgreSQL. Refresh rejeita sessão inválida/usuário inativo, consulta perfil atual, prepara credenciais e retorna o par só após rotação confirmada. Logout recebe identificador autenticado da borda HTTP e coordena revogação. API valida JWT/extrai sub; Infrastructure controla transações/concorrência.
+Atualização/perfil/inativação usam IUnidadeDeTrabalhoUsuarios para consultar o estado depois do bloqueio e confirmar usuário/auditoria juntos. Dados normalizados iguais, perfil atual ou conta já inativa não geram novo registro. Inativação e seu log usam o mesmo instante UTC.
 
-E09 conectará consultas/administração e auditorias restantes. Substitutos ficam só nos testes; nenhuma persistência em memória foi registrada na API.
+Login verifica a senha inicialmente fora do bloqueio, depois relê atividade/e-mail/perfil dentro da unidade de trabalho. Refresh também consulta estado atual depois do bloqueio e retorna o par somente após rotação/commit confirmados. Logout coordena revogação pelo usuário autenticado informado pela borda HTTP.
 
-Veja [guia E08](../../docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md) e [mapa da extração E04](../../docs/planejamento/MAPA-EXTRACAO-IDENTITY-E04.md).
+Application coordena regras/transações por interface; Infrastructure implementa EF/PostgreSQL. A identidade/permissão HTTP é responsabilidade da Api. Substitutos ficam exclusivamente nos testes. Não há Outbox/mensageria antes das E10–E13.
+
+[Guia E09](../../docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md), [guia E08](../../docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md) e [mapa E04](../../docs/planejamento/MAPA-EXTRACAO-IDENTITY-E04.md).
