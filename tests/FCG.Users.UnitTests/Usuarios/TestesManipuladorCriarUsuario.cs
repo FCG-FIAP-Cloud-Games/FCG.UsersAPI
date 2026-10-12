@@ -1,3 +1,4 @@
+using FCG.Notifications.Application.Messaging.Contracts;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Abstractions.Security;
 using FCG.Users.Application.Usuarios;
@@ -29,6 +30,14 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.Equal(repositorio.UsuarioAdicionado.CriadoEmUtc, repositorio.RegistroCadastroAdicionado.DataCriacao);
         Assert.Equal("Usuário cadastrado.", repositorio.RegistroCadastroAdicionado.Descricao);
         Assert.Equal(TestContext.Current.CancellationToken, repositorio.TokenCancelamentoRecebido);
+        Assert.NotNull(repositorio.EventoAdicionado);
+        Assert.NotEqual(Guid.Empty, repositorio.EventoAdicionado.EventId);
+        Assert.NotEqual(Guid.Empty, repositorio.EventoAdicionado.CorrelationId);
+        Assert.Equal(1, repositorio.EventoAdicionado.Version);
+        Assert.Equal(repositorio.UsuarioAdicionado.Id, repositorio.EventoAdicionado.UserId);
+        Assert.Equal(repositorio.UsuarioAdicionado.Nome, repositorio.EventoAdicionado.Name);
+        Assert.Equal(repositorio.UsuarioAdicionado.Email, repositorio.EventoAdicionado.Email);
+        Assert.Equal(repositorio.UsuarioAdicionado.CriadoEmUtc, repositorio.EventoAdicionado.OccurredAt);
         Assert.All(
             new[] { repositorio.UsuarioAdicionado.Nome, repositorio.UsuarioAdicionado.CPF, repositorio.UsuarioAdicionado.Email, repositorio.UsuarioAdicionado.SenhaHash },
             valor => Assert.False(string.IsNullOrWhiteSpace(valor)));
@@ -46,6 +55,28 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.NotNull(repositorio.UsuarioAdicionado);
         Assert.NotNull(repositorio.RegistroCadastroAdicionado);
         Assert.Equal(repositorio.UsuarioAdicionado.CriadoEmUtc, repositorio.RegistroCadastroAdicionado.DataCriacao);
+        Assert.NotNull(repositorio.EventoAdicionado);
+        Assert.Equal(repositorio.UsuarioAdicionado.CriadoEmUtc, repositorio.EventoAdicionado.OccurredAt);
+    }
+
+    [Fact]
+    public async Task ProcessarPreservaCorrelacaoInformada()
+    {
+        var repositorio = new RepositorioUsuariosStub();
+        var correlacao = Guid.NewGuid();
+        await CriarManipulador(repositorio).ProcessarAsync(CriarComando() with { CorrelationId = correlacao }, TestContext.Current.CancellationToken);
+        Assert.Equal(correlacao, repositorio.EventoAdicionado!.CorrelationId);
+    }
+
+    [Fact]
+    public async Task CorrelacaoVaziaRecusaCadastroAntesDeConsultarOuPersistir()
+    {
+        var repositorio = new RepositorioUsuariosStub();
+        var resultado = await CriarManipulador(repositorio).ProcessarAsync(CriarComando() with { CorrelationId = Guid.Empty }, TestContext.Current.CancellationToken);
+        Assert.Equal(StatusCriacaoUsuario.DadosInvalidos, resultado.Status);
+        Assert.Contains("correlationId", resultado.Erros);
+        Assert.False(repositorio.Consultado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Fact]
@@ -75,6 +106,7 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.Contains(campo, resultado.Erros);
         Assert.Null(repositorio.UsuarioAdicionado);
         Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Fact]
@@ -93,6 +125,7 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.False(hash.Calculado);
         Assert.Null(repositorio.UsuarioAdicionado);
         Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Fact]
@@ -111,6 +144,7 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.Equal(StatusCriacaoUsuario.PerfilNaoEncontrado, resultado.Status);
         Assert.Null(repositorio.UsuarioAdicionado);
         Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Fact]
@@ -122,6 +156,7 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.Equal(StatusCriacaoUsuario.EmailJaCadastrado, resultado.Status);
         Assert.Null(repositorio.UsuarioAdicionado);
         Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Fact]
@@ -133,6 +168,7 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.Equal(StatusCriacaoUsuario.CpfJaCadastrado, resultado.Status);
         Assert.Null(repositorio.UsuarioAdicionado);
         Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Theory]
@@ -157,6 +193,7 @@ public sealed class TestesManipuladorCriarUsuario
         Assert.False(hash.Calculado);
         Assert.Null(repositorio.UsuarioAdicionado);
         Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
     }
 
     [Fact]
@@ -240,6 +277,7 @@ public sealed class TestesManipuladorCriarUsuario
             Assert.False(hash.Calculado);
             Assert.Null(repositorio.UsuarioAdicionado);
             Assert.Null(repositorio.RegistroCadastroAdicionado);
+        Assert.Null(repositorio.EventoAdicionado);
         }
         else
         {
@@ -248,6 +286,19 @@ public sealed class TestesManipuladorCriarUsuario
         }
     }
 
+    [Fact]
+    public async Task ProcessarUniformizaPrecisaoDoInstanteNoUsuarioAuditoriaEPayload()
+    {
+        var repositorio = new RepositorioUsuariosStub();
+        var instante = Agora.AddTicks(19);
+        var manipulador = new ManipuladorCriarUsuario(repositorio, new HashSenhaStub(), new RelogioFixo(instante));
+        var resultado = await manipulador.ProcessarAsync(CriarComando(), TestContext.Current.CancellationToken);
+        Assert.Equal(StatusCriacaoUsuario.Criado, resultado.Status);
+        var esperado = Agora.AddTicks(10);
+        Assert.Equal(esperado, repositorio.UsuarioAdicionado!.CriadoEmUtc);
+        Assert.Equal(esperado, repositorio.RegistroCadastroAdicionado!.DataCriacao);
+        Assert.Equal(esperado, repositorio.EventoAdicionado!.OccurredAt);
+    }
     private static ComandoCriarUsuario CriarComando() => new(
         "  Maria   da Silva  ", "123.456.789-00", DateOnly.FromDateTime(Agora.UtcDateTime).AddYears(-20),
         "  MARIA@EXEMPLO.COM  ", "Senha@123", PerfilId);
@@ -264,6 +315,7 @@ public sealed class TestesManipuladorCriarUsuario
         public bool CpfExiste { get; init; }
         public Usuario? UsuarioAdicionado { get; private set; }
         public LogUsuario? RegistroCadastroAdicionado { get; private set; }
+        public UserCreatedEvent? EventoAdicionado { get; private set; }
         public CancellationToken TokenCancelamentoRecebido { get; private set; }
         public Task<Usuario?> ObterPorIdAsync(Guid id, CancellationToken token = default) => RegistrarConsulta<Usuario?>(null);
         public Task<Usuario?> ObterPorEmailAsync(string email, CancellationToken token = default) => RegistrarConsulta<Usuario?>(null);
@@ -277,10 +329,11 @@ public sealed class TestesManipuladorCriarUsuario
             Consultado = true;
             return Task.FromResult(valor);
         }
-        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario usuario, LogUsuario registroCadastro, CancellationToken token = default)
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario usuario, LogUsuario registroCadastro, UserCreatedEvent eventoCriacao, CancellationToken token = default)
         {
             UsuarioAdicionado = usuario;
             RegistroCadastroAdicionado = registroCadastro;
+            EventoAdicionado = eventoCriacao;
             TokenCancelamentoRecebido = token;
             return Task.FromResult(ResultadoGravacao);
         }

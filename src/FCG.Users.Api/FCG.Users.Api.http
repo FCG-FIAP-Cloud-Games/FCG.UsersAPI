@@ -1,3 +1,5 @@
+# Preparação: docs/operacao/EXECUTAR-USERSAPI-DO-ZERO.md; CLI admin é local, sem endpoint público.
+# Nunca versionar valores reais nos placeholders de access/refresh. /health é apenas liveness.
 @baseUrl = http://localhost:5088
 
 ### Saúde do processo
@@ -10,9 +12,11 @@ Accept: application/json
 
 ### Cadastro público de usuário comum (dados sintéticos, senha fictícia apenas para demonstração)
 # Requer banco configurado e migration aplicada. Não existe escolha de perfil nesta requisição.
+# X-Correlation-ID é opcional, devolvido e preservado no evento; não evita cadastro duplicado.
 # Sucesso: 201, dados públicos e Location. GET nesse endereço exige JWT do titular ou administrador.
 # Repetir este exemplo no mesmo banco retorna 409. Para novo cadastro, altere CPF e e-mail.
 POST {{baseUrl}}/api/v1/usuarios
+X-Correlation-ID: f1400000-0000-4000-8000-000000000001
 Content-Type: application/json
 Accept: application/json
 
@@ -26,6 +30,7 @@ Accept: application/json
 
 ### Cadastro inválido: 400 application/problem+json com erros por campo
 POST {{baseUrl}}/api/v1/usuarios
+X-Correlation-ID: f1400000-0000-4000-8000-000000000001
 Content-Type: application/json
 Accept: application/problem+json
 

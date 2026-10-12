@@ -1,27 +1,36 @@
 # FCG.Users.Infrastructure
 
-PostgreSQL próprio e segurança concreta do UsersAPI. **E09 concluída em 06/10/2026**, reutilizando a migration inicial da E05.
+PostgreSQL próprio e segurança concreta do UsersAPI. E11 acrescenta Outbox própria e segunda migration. E12 acrescenta transporte/worker sem alterar o schema.
 
 | Grupo | Responsabilidade |
 |---|---|
-| Data/UsersDbContext | Usuario, Perfil, Token e LogUsuario, com contexto scoped. |
-| Data/Mappings e Migrations | Schema, limites, índices/checks/FKs, perfis estáveis e migration/snapshot próprios. |
+| Data/UsersDbContext | Usuario, Perfil, Token, LogUsuario e MensagemOutbox. |
+| Data/Outbox | Estado técnico e serialização do snapshot de UserCreatedEvent. |
+| Data/Mappings e Migrations | Schema, índices/checks/FKs e migrations próprias. |
 | Data/UsersDbContextFactory | Ferramenta EF via ConnectionStrings__UsersDatabase. |
-| RepositorioUsuarios | Cadastro/atualização com auditoria obrigatória e uma gravação atômica. |
-| UnidadeDeTrabalhoUsuarios | Transação e SELECT FOR UPDATE parametrizado por usuário; participação na transação externa. |
-| RepositorioTokens | Hash do refresh, rotação condicional e logout sob a mesma coordenação. |
-| InicializadorAdministradorLocal | Primeiro administrador explícito, transação e bloqueio na linha do perfil. |
-| Security | PBKDF2/Identity compatíveis, RSA externo/kid, emissão JWT e refresh aleatório. |
-| DependencyInjection | Registros de persistência/hash/tokens/unidade de trabalho e validação de configuração. |
+| RepositorioUsuarios | Cadastro com usuário/auditoria/evento numa gravação; atualização com auditoria. |
+| UnidadeDeTrabalhoUsuarios | Transação e SELECT FOR UPDATE parametrizado por usuário. |
+| RepositorioTokens | Hash de refresh, rotação condicional e logout coordenados. |
+| InicializadorAdministradorLocal | Primeiro administrador explícito, transação e lock do perfil. |
+| Security | Hash compatível, RSA externo/kid, emissão JWT e refresh aleatório. |
+| Messaging | Configuração externa, transporte MassTransit/RabbitMQ, processador e BackgroundService. |
+| DependencyInjection | Registros e validação de configuração. |
 
-ObterPorIdAsync rastreia para atualização no mesmo contexto; consultas de autenticação/e-mail usam AsNoTracking. AtualizarAsync exige usuário rastreado e LogUsuario do mesmo alvo. O EF grava somente campos alterados, incluindo auditoria na mesma transação. Índices conhecidos traduzem conflitos e não deixam logs órfãos. Outras falhas provocam rollback/tratamento HTTP genérico.
+Cadastro valida coerência dos três objetos, inclui-os no contexto e chama SaveChangesAsync uma vez. Falhas desanexam a tentativa rejeitada; somente constraints conhecidas de e-mail/CPF são traduzidas em conflito de cadastro. EventId duplicado é falha técnica.
 
-A unidade de trabalho bloqueia a linha antes da consulta atual e coordena edição/perfil/inativação/login/refresh/logout. Chamadas internas participam da transação do mesmo contexto sem commit independente. Só a transação externa confirma o resultado; exceção limpa rastreamento e dispose desfaz a transação.
+tb_Outbox guarda nove campos, payload jsonb de sete propriedades, UTC, EventId único, FK Restrict, checks e índice parcial para pendências. Nasce com PublishedAt nulo e Attempts zero. Na E12, o worker opcional reserva cada linha com FOR UPDATE SKIP LOCKED, valida o snapshot e publica com confirmação/mandatory. Persiste Attempts e PublishedAt após a tentativa; falhas mantêm a pendência. Não usa lease ou Outbox nativa do MassTransit.
 
-A rotação revoga somente um refresh ainda válido e inclui o sucessor atomicamente. Logout alcança sessões confirmadas antes de obter o bloqueio. Inativação não remove sessões históricas: login/refresh conferem Ativo; access anterior conserva validade até expirar.
+Migração inicial: 20261004145013_CriacaoInicialUsers. Evolução E11: 20261007023803_OutboxUserCreated. Sem migrations automáticas no startup ou eventos retroativos para usuários existentes.
 
-Hash de cadastro: PBKDF2-SHA256, salt aleatório, 100.000 iterações; verificação preserva compatibilidade aprovada com PBKDF2/Identity. Refresh: 64 bytes aleatórios em Base64URL, SHA-256 no banco, duração configurada de sete dias. JWT: RS256, sub/role/iat/jti, issuer/audience/exp/nbf, access configurado para 15 minutos. PEM privado externo pertence ao emissor; públicas confiáveis são selecionadas exatamente por kid.
+AtualizarAsync exige usuário rastreado e auditoria do mesmo alvo. Grava somente campos alterados, sem recriar o evento de cadastro. Operações protegidas/login/refresh/logout preservam a unidade de trabalho por usuário; somente a transação externa confirma os fluxos que a utilizam.
 
-Sem migrations automáticas no startup. E06–E09 não alteram schema. Outbox/RabbitMQ pertencem às E10–E13.
+Hash: PBKDF2-SHA256 com salt aleatório, verificação compatível com os formatos aprovados. Refresh: aleatório, SHA-256 no banco e duração configurável. JWT: RS256, privadas externas e públicas selecionadas por kid confiável. As regras atuais de sessão foram revalidadas na suíte completa E13.
 
-[Guia E09](../../docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md), [persistência E05](../../docs/aprendizado/E05-PERSISTENCIA-PROPRIA.md), [segurança E07](../../docs/aprendizado/E07-LOGIN-E-JWT-RS256.md) e [sessões E08](../../docs/aprendizado/E08-REFRESH-LOGOUT-E-CONCORRENCIA.md).
+[Guia E11](../../docs/aprendizado/E11-CADASTRO-E-OUTBOX-ATOMICA.md) · [Decisão](../../docs/decisoes/ADR-005-OUTBOX-PROPRIA-E-CADASTRO-ATOMICO.md) · [SQL da evolução](../../docs/evidencias/E11/outbox-migration.sql).
+
+E12 usa lotes sequenciais, prazo de publicação, cancelamento e espera progressiva geral após o lote. Nenhum agendamento por linha foi acrescentado. Reenvio após envio sem commit é possível; identidade/payload são conservados para deduplicação no consumidor.
+
+[Guia E12](../../docs/aprendizado/E12-PUBLICADOR-OUTBOX-E-RABBITMQ.md) · [Configuração](../../docs/contratos/CONFIGURACAO-PUBLICADOR-E12.md) · [Evidências atuais](../../docs/evidencias/E12/README.md).
+
+
+E13 comprovou o mesmo publicador em processos reais: retorno do broker, reinício com pendência, crash após envio e duas instâncias. O código de produção não foi alterado. [Provas E13](../../docs/evidencias/E13/README.md) · [Guia E13](../../docs/aprendizado/E13-RECUPERACAO-REENTREGA-E-CONCORRENCIA.md).

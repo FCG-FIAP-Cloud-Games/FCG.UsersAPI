@@ -5,5 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MassTransit.RabbitMQ" />
+    <ProjectReference Include="../../src/FCG.Users.Application/FCG.Users.Application.csproj" />
   </ItemGroup>
 </Project>

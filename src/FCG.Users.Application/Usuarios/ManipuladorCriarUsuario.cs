@@ -1,3 +1,5 @@
+using FCG.Notifications.Application.Messaging.Contracts;
+using FCG.Users.Application.Messaging;
 using System.Net.Mail;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Abstractions.Security;
@@ -47,7 +49,9 @@ public sealed class ManipuladorCriarUsuario
         if (await _repositorioUsuarios.ExisteCpfAsync(cpf, null, tokenCancelamento))
             return ResultadoCriarUsuario.ConflitoCpf();
 
-        var agora = _relogio.GetUtcNow();
+        var instante = _relogio.GetUtcNow();
+        // O contrato usa microssegundos: payload JSON e colunas de horário mantêm o mesmo instante.
+        var agora = new DateTimeOffset(instante.UtcTicks - instante.UtcTicks % TimeSpan.TicksPerMicrosecond, TimeSpan.Zero);
         var usuario = new Usuario(
             Guid.NewGuid(),
             nome,
@@ -59,7 +63,9 @@ public sealed class ManipuladorCriarUsuario
             agora);
         var registroCadastro = LogUsuario.RegistrarCadastro(usuario.Id, agora);
 
-        var gravacao = await _repositorioUsuarios.TentarAdicionarAsync(usuario, registroCadastro, tokenCancelamento);
+        var evento = new UserCreatedEvent(Guid.NewGuid(), comando.CorrelationId ?? Guid.NewGuid(), agora,
+            DefinicaoUserCreatedEvent.Versao, usuario.Id, usuario.Nome, usuario.Email);
+        var gravacao = await _repositorioUsuarios.TentarAdicionarAsync(usuario, registroCadastro, evento, tokenCancelamento);
 
         return gravacao switch
         {
@@ -109,6 +115,8 @@ public sealed class ManipuladorCriarUsuario
             erros["dataNascimento"] = ["Informe uma data de nascimento válida e não futura."];
         if (!SenhaValida(comando.Senha))
             erros["senha"] = ["A senha deve ter ao menos 8 caracteres, com maiúscula, minúscula, número e caractere especial."];
+        if (comando.CorrelationId == Guid.Empty)
+            erros["correlationId"] = ["Informe um identificador de correlação válido."];
         if (comando.PerfilId == Guid.Empty)
             erros["perfilId"] = ["Informe um perfil válido."];
 

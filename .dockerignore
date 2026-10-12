@@ -1,0 +1,23 @@
+# Lista de inclusão: arquivos pessoais, resultados, documentação e .git não vão para o build.
+**
+!Dockerfile
+!global.json
+!Directory.Build.props
+!Directory.Packages.props
+!src/
+!src/**
+!tools/
+!tools/FCG.Users.DemoSetup/
+!tools/FCG.Users.DemoSetup/**
+**/bin/
+**/obj/
+**/.vs/
+**/.env
+**/.env.*
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/secrets.json
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12

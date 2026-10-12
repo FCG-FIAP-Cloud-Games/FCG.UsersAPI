@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace FCG.Users.IntegrationTests.Support;
 
@@ -79,6 +80,10 @@ internal sealed class FabricaUsersApi : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_ambiente);
+
+        // Hosts descartáveis de teste não usam EventLog/console do sistema. Os coletores
+        // de cada cenário são adicionados depois, por ConfigureTestServices.
+        builder.ConfigureLogging(logging => logging.ClearProviders());
 
         builder.ConfigureAppConfiguration((_, configuracao) =>
         {

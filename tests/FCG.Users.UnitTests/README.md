@@ -1,22 +1,24 @@
 # Testes unitários do UsersAPI
 
-xUnit 3, Domain/Application. **106 aprovados em 06/10/2026**, zero falhas/ignorados.
+xUnit 3, Domain/Application. E14: em cópia limpa, os 109 casos foram reexecutados e aprovados, zero falhas/ignorados. A nova cobertura técnica do publicador fica em IntegrationTests.
 
 | Grupo | Verifica |
 |---|---|
-| Domain | Usuário/perfil, CPF/nascimento, token e quatro descrições de auditoria. |
-| Usuarios | Cadastro/consulta/dados/perfil/inativação; validações, conflitos, auditoria e idempotência. |
+| Domain | Usuário/perfil, CPF/nascimento, token e quatro ações de auditoria. |
+| Usuarios | Validações, conflitos, normalização, consulta/administração e evento de cadastro. |
 | Auth | Coordenação de login/refresh/logout com substitutos. |
-| Support | Unidade de trabalho substituta, apenas para coordenação dos casos de uso. |
+| Support | Relógios e unidades de trabalho substitutos. |
 
-Seis novos cenários de inativação verificam usuário ativo/registro do mesmo alvo e instante, repetição sem log/data nova, GUID vazio, ausente e conflitos inesperados. Os testes de dados/perfil passaram a conferir a auditoria entregue ao repositório.
+Três casos novos sobre a base de 106: correlação informada preservada; correlação vazia rejeitada antes da persistência; precisão de microssegundos idêntica entre usuário/log/evento. Casos existentes passaram a capturar o evento e conferir sua ausência em cadastros recusados.
 
-Relógios controlados comprovam os instantes sem depender da data da execução. Substitutos não simulam a garantia de banco: transações, lock, atomicidade e concorrência são verificados no projeto IntegrationTests com PostgreSQL real.
+Substitutos não demonstram transação real. Atomicidade, rollback/commit e concorrência são comprovados no projeto IntegrationTests com PostgreSQL.
 
-Após compilar, na raiz:
+Na raiz, após compilar Release:
 
 ```powershell
 dotnet test tests/FCG.Users.UnitTests -c Release --no-build --no-restore
 ```
 
-Não exige Docker. [Guia E09](../../docs/aprendizado/E09-OPERACOES-PROTEGIDAS-E-AUDITORIA.md) e [evidências](../../docs/evidencias/E09/README.md).
+Não exige Docker. [Guia E11](../../docs/aprendizado/E11-CADASTRO-E-OUTBOX-ATOMICA.md) e [evidências](../../docs/evidencias/E11/README.md).
+
+[Evidências atuais E14](../../docs/evidencias/E14/README.md).

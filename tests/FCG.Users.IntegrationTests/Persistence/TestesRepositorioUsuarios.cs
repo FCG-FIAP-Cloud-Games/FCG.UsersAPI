@@ -18,7 +18,7 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         await using (var escrita = banco.CriarContexto())
         {
             var repositorio = new RepositorioUsuarios(escrita);
-            Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await repositorio.TentarAdicionarAsync(usuario, LogUsuario.RegistrarCadastro(usuario.Id, usuario.CriadoEmUtc), Cancelamento));
+            Assert.Equal(ResultadoGravacaoUsuario.Sucesso, await repositorio.TentarAdicionarAsync(usuario, LogUsuario.RegistrarCadastro(usuario.Id, usuario.CriadoEmUtc), DadosPersistencia.EventoCriado(usuario), Cancelamento));
         }
         await using var leitura = banco.CriarContexto();
         var carregado = await new RepositorioUsuarios(leitura).ObterPorIdAsync(usuario.Id, Cancelamento);
@@ -86,8 +86,8 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         Assert.False(await repositorioA.ExisteCpfAsync(primeiro.CPF, null, Cancelamento));
         Assert.False(await repositorioB.ExisteCpfAsync(segundo.CPF, null, Cancelamento));
         var resultados = await Task.WhenAll(
-            repositorioA.TentarAdicionarAsync(primeiro, LogUsuario.RegistrarCadastro(primeiro.Id, primeiro.CriadoEmUtc), Cancelamento),
-            repositorioB.TentarAdicionarAsync(segundo, LogUsuario.RegistrarCadastro(segundo.Id, segundo.CriadoEmUtc), Cancelamento));
+            repositorioA.TentarAdicionarAsync(primeiro, LogUsuario.RegistrarCadastro(primeiro.Id, primeiro.CriadoEmUtc), DadosPersistencia.EventoCriado(primeiro), Cancelamento),
+            repositorioB.TentarAdicionarAsync(segundo, LogUsuario.RegistrarCadastro(segundo.Id, segundo.CriadoEmUtc), DadosPersistencia.EventoCriado(segundo), Cancelamento));
         Assert.Single(resultados, resultado => resultado == ResultadoGravacaoUsuario.Sucesso);
         Assert.Single(resultados, resultado => resultado == (mesmoEmail
             ? ResultadoGravacaoUsuario.ConflitoEmail : ResultadoGravacaoUsuario.ConflitoCpf));
@@ -99,9 +99,11 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         var novaTentativa = DadosPersistencia.NovoUsuario();
         Assert.Equal(ResultadoGravacaoUsuario.Sucesso,
             await perdedor.TentarAdicionarAsync(novaTentativa,
-                LogUsuario.RegistrarCadastro(novaTentativa.Id, novaTentativa.CriadoEmUtc), Cancelamento));
+                LogUsuario.RegistrarCadastro(novaTentativa.Id, novaTentativa.CriadoEmUtc), DadosPersistencia.EventoCriado(novaTentativa), Cancelamento));
         Assert.Equal(1, await verificacao.LogsUsuarios.CountAsync(
             log => log.UsuarioId == primeiro.Id || log.UsuarioId == segundo.Id, Cancelamento));
+        Assert.Equal(1, await verificacao.MensagensOutbox.CountAsync(
+            evento => evento.UserId == primeiro.Id || evento.UserId == segundo.Id, Cancelamento));
     }
 
     [Fact]
@@ -116,7 +118,7 @@ public sealed class TestesRepositorioUsuarios(BancoUsersFixture banco)
         Assert.False(await repositorio.ExisteEmailAsync(concorrente.Email, usuario.Id, Cancelamento));
         await using (var outraSolicitacao = banco.CriarContexto())
             Assert.Equal(ResultadoGravacaoUsuario.Sucesso,
-                await new RepositorioUsuarios(outraSolicitacao).TentarAdicionarAsync(concorrente, LogUsuario.RegistrarCadastro(concorrente.Id, concorrente.CriadoEmUtc), Cancelamento));
+                await new RepositorioUsuarios(outraSolicitacao).TentarAdicionarAsync(concorrente, LogUsuario.RegistrarCadastro(concorrente.Id, concorrente.CriadoEmUtc), DadosPersistencia.EventoCriado(concorrente), Cancelamento));
         carregado.AtualizarDados("Nome alterado", carregado.DataNascimento, concorrente.Email);
         Assert.Equal(ResultadoGravacaoUsuario.ConflitoEmail,
             await repositorio.AtualizarAsync(carregado, LogUsuario.RegistrarAlteracaoDados(carregado.Id, DadosPersistencia.Agora), Cancelamento));

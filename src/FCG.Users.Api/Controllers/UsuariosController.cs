@@ -125,8 +125,14 @@ public sealed class UsuariosController(IAuthorizationService autorizacao) : Cont
     private async Task<ActionResult<RespostaUsuario>> CriarComPerfilAsync(RequisicaoCriarUsuario requisicao,
         Guid perfilId, ManipuladorCriarUsuario manipulador, CancellationToken tokenCancelamento)
     {
+        var correlacao = Guid.NewGuid();
+        if (Request.Headers.TryGetValue("X-Correlation-ID", out var informado)
+            && (informado.Count != 1 || !Guid.TryParseExact(informado[0], "D", out correlacao) || correlacao == Guid.Empty))
+            return ResponderDadosInvalidos(new Dictionary<string, string[]>
+            { ["correlationId"] = ["O cabeçalho X-Correlation-ID deve conter um único UUID válido, não vazio, no formato com hífens."] });
+        Response.Headers["X-Correlation-ID"] = correlacao.ToString("D");
         var resultado = await manipulador.ProcessarAsync(new ComandoCriarUsuario(
-            requisicao.Nome, requisicao.CPF, requisicao.DataNascimento, requisicao.Email, requisicao.Senha, perfilId), tokenCancelamento);
+            requisicao.Nome, requisicao.CPF, requisicao.DataNascimento, requisicao.Email, requisicao.Senha, perfilId, correlacao), tokenCancelamento);
         if (resultado.Status == StatusCriacaoUsuario.DadosInvalidos) return ResponderDadosInvalidos(resultado.Erros);
         if (resultado.Status == StatusCriacaoUsuario.PerfilNaoEncontrado)
             throw new InvalidOperationException("O perfil necessário para cadastro não está configurado.");

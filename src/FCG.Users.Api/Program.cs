@@ -1,3 +1,4 @@
+using FCG.Users.Infrastructure.Messaging;
 using FCG.Users.Infrastructure.Repositories;
 using FCG.Users.Api.Configuration;
 using FCG.Users.Application.Auth;
@@ -30,6 +31,7 @@ builder.Services.AddScoped<ManipuladorLogin>();
 builder.Services.AddScoped<ManipuladorRenovarToken>();
 builder.Services.AddScoped<ManipuladorLogout>();
 
+builder.Services.AdicionarPublicadorOutbox(builder.Configuration);
 builder.Services.AdicionarSegurancaAutenticacao(builder.Configuration);
 builder.Services.AdicionarAutenticacaoJwt();
 builder.Services.AddControllers();

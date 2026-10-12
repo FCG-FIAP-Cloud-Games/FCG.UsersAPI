@@ -1,0 +1,73 @@
+{
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "FCG.Notifications.Application.Messaging.Contracts:UserCreatedEvent",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "notifications-user-created",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "notifications-user-created",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "FCG.Notifications.Application.Messaging.Contracts:UserCreatedEvent",
+      "vhost": "/",
+      "destination": "notifications-user-created",
+      "destination_type": "exchange",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "notifications-user-created",
+      "vhost": "/",
+      "destination": "notifications-user-created",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
+  ],
+  "users": [
+    {
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "name": "fcg_demo",
+      "tags": [
+        "administrator"
+      ],
+      "password_hash": "IFRDR++IN0jEHt4xnyTYsER8AkZ1TQUltEVBINplmWIiWJ0F"
+    }
+  ],
+  "permissions": [
+    {
+      "read": ".*",
+      "vhost": "/",
+      "configure": ".*",
+      "user": "fcg_demo",
+      "write": ".*"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+# Ambiente local de demonstração. Credenciais sintéticas e conhecidas, sem segredos reais.
+# Executar: docker compose up --build -d
+name: fcg-users-demo
+
+x-configuracao-base: &configuracao-base
+  DOTNET_ENVIRONMENT: Development
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__UsersDatabase: "Host=postgres;Port=5432;Database=fcg_users_demo;Username=fcg_users_demo;Password=UsersDb_Demo_2026!;Include Error Detail=false"
+  Jwt__Issuer: FIAP.CloudGames
+  Jwt__Audience: FIAP.CloudGames.Api
+  Jwt__AccessTokenExpirationMinutes: "15"
+  Jwt__RefreshTokenExpirationDays: "7"
+  Jwt__Signing__ActiveKeyId: users-demo-v1
+  Jwt__Signing__PrivateKeyPath: /data/jwt/private.pem
+  Jwt__Validation__Keys__0__KeyId: users-demo-v1
+  Jwt__Validation__Keys__0__PublicKeyPath: /data/jwt/public.pem
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fcg_users_demo
+      POSTGRES_USER: fcg_users_demo
+      POSTGRES_PASSWORD: "UsersDb_Demo_2026!"
+    volumes:
+      - postgres-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fcg_users_demo -d fcg_users_demo"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  rabbitmq:
+    # Mesmo artefato RabbitMQ 4.3.6 usado nas provas de integração E12–E14.
+    image: rabbitmq@sha256:8dd6e3570ddaa2ef82a6c3a8950e79c1f73893adfbdddbc374fc1f1ac8a0f5dd
+    hostname: rabbitmq
+    # Usuário e permissões são importados de definitions.json no primeiro boot.
+    ports:
+      - "127.0.0.1:${FCG_RABBIT_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-dados:/var/lib/rabbitmq
+      - ./infra/demo/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/demo/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  preparacao:
+    build:
+      context: .
+      target: preparacao
+    environment:
+      <<: *configuracao-base
+      DOTNET_RUNNING_IN_CONTAINER: "true"
+      DemonstracaoLocal__Habilitada: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - jwt-chaves:/data/jwt
+    restart: "no"
+
+  usersapi:
+    build:
+      context: .
+      target: api
+    environment:
+      <<: *configuracao-base
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Swagger__Enabled: "true"
+      Outbox__Enabled: "true"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__VirtualHost: /
+      RabbitMq__Username: fcg_demo
+      RabbitMq__Password: "Rabbit_Demo_2026!"
+      RabbitMq__UseTls: "false"
+    ports:
+      - "127.0.0.1:${FCG_USERS_HTTP_PORT:-5088}:8080"
+    volumes:
+      - jwt-chaves:/data/jwt:ro
+    depends_on:
+      preparacao:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-dados:
+  rabbitmq-dados:
+  jwt-chaves:

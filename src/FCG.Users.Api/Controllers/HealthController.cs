@@ -20,7 +20,8 @@ public sealed class HealthController : ControllerBase
     [ProducesResponseType<HealthResponse>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<HealthResponse>> VerificarAsync(CancellationToken tokenCancelamento)
     {
-        var relatorio = await _healthChecks.CheckHealthAsync(tokenCancelamento);
+        // /health é liveness. A verificação ready adicionada pelo MassTransit não deve derrubar o processo HTTP.
+        var relatorio = await _healthChecks.CheckHealthAsync(registro => registro.Tags.Contains("live"), tokenCancelamento);
         var statusHttp = relatorio.Status == HealthStatus.Unhealthy
             ? StatusCodes.Status503ServiceUnavailable
             : StatusCodes.Status200OK;

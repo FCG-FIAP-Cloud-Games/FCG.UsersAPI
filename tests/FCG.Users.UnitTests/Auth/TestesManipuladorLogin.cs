@@ -1,3 +1,4 @@
+using FCG.Notifications.Application.Messaging.Contracts;
 using FCG.Users.UnitTests.Support;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Abstractions.Security;
@@ -278,7 +279,7 @@ public sealed class TestesManipuladorLogin
         public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(
             Usuario usuario,
             LogUsuario registroCadastro,
-            CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+            UserCreatedEvent eventoCriacao, CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
 
         public Task<ResultadoGravacaoUsuario> AtualizarAsync(Usuario usuario, LogUsuario registroAuditoria, CancellationToken tokenCancelamento = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }

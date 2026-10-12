@@ -1,6 +1,8 @@
+using FCG.Notifications.Application.Messaging.Contracts;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Domain.Entities;
 using FCG.Users.Infrastructure.Data;
+using FCG.Users.Infrastructure.Data.Outbox;
 using FCG.Users.Infrastructure.Data.Mappings;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -49,7 +51,7 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
     public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(
         Usuario usuario,
         LogUsuario registroCadastro,
-        CancellationToken tokenCancelamento = default)
+        UserCreatedEvent eventoCriacao, CancellationToken tokenCancelamento = default)
     {
         ArgumentNullException.ThrowIfNull(usuario);
         ArgumentNullException.ThrowIfNull(registroCadastro);
@@ -57,10 +59,20 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
             throw new ArgumentException(
                 "O registro de cadastro deve pertencer ao usuário cadastrado.", nameof(registroCadastro));
 
+        ArgumentNullException.ThrowIfNull(eventoCriacao);
+        if (eventoCriacao.UserId != usuario.Id || eventoCriacao.OccurredAt != usuario.CriadoEmUtc
+            || registroCadastro.DataCriacao != usuario.CriadoEmUtc
+            || !string.Equals(eventoCriacao.Name, usuario.Nome, StringComparison.Ordinal)
+            || !string.Equals(eventoCriacao.Email, usuario.Email, StringComparison.Ordinal))
+            throw new ArgumentException("O evento deve representar o mesmo usuário e instante do cadastro.", nameof(eventoCriacao));
+        var mensagemOutbox = MensagemOutbox.Criar(eventoCriacao);
+        tokenCancelamento.ThrowIfCancellationRequested();
+
         contexto.Usuarios.Add(usuario);
         contexto.LogsUsuarios.Add(registroCadastro);
-        // Um único SaveChanges confirma as duas inclusões na mesma transação do EF Core.
-        return SalvarAsync(usuario, tokenCancelamento, registroCadastro);
+        contexto.MensagensOutbox.Add(mensagemOutbox);
+        // As três inclusões participam do mesmo SaveChanges/transação; não há chamada ao broker.
+        return SalvarAsync(usuario, tokenCancelamento, registroCadastro, mensagemOutbox);
     }
 
     public Task<ResultadoGravacaoUsuario> AtualizarAsync(
@@ -91,7 +103,8 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
     private async Task<ResultadoGravacaoUsuario> SalvarAsync(
         Usuario usuario,
         CancellationToken tokenCancelamento,
-        LogUsuario? registroAuditoria = null)
+        LogUsuario? registroAuditoria = null,
+        MensagemOutbox? mensagemOutbox = null)
     {
         try
         {
@@ -100,12 +113,7 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
         }
         catch (DbUpdateException exception)
         {
-            if (registroAuditoria is not null)
-            {
-                // O rollback desfaz o banco; desanexar evita repetir estas inclusões em outro SaveChanges.
-                contexto.Entry(registroAuditoria).State = EntityState.Detached;
-                contexto.Entry(usuario).State = EntityState.Detached;
-            }
+            DesanexarGravacao();
 
             if (exception.InnerException is PostgresException
                 {
@@ -120,6 +128,22 @@ public sealed class RepositorioUsuarios(UsersDbContext contexto) : IRepositoryUs
             }
 
             throw;
+        }
+        catch
+        {
+            // Também limpa inclusões se o save/commit for cancelado ou falhar fora de DbUpdateException.
+            DesanexarGravacao();
+            throw;
+        }
+
+        void DesanexarGravacao()
+        {
+            if (mensagemOutbox is not null) contexto.Entry(mensagemOutbox).State = EntityState.Detached;
+            if (registroAuditoria is not null)
+            {
+                contexto.Entry(registroAuditoria).State = EntityState.Detached;
+                contexto.Entry(usuario).State = EntityState.Detached;
+            }
         }
     }
 }

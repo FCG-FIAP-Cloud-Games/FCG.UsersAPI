@@ -31,3 +31,6 @@ secrets/
 *.tmp
 .DS_Store
 Thumbs.db
+
+# Ambiente local genérico E14
+.local/

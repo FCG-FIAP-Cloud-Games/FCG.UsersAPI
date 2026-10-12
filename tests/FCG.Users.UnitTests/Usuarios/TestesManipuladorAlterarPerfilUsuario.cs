@@ -1,3 +1,4 @@
+using FCG.Notifications.Application.Messaging.Contracts;
 using FCG.Users.UnitTests.Support;
 using FCG.Users.Application.Abstractions.Repositories;
 using FCG.Users.Application.Usuarios;
@@ -124,6 +125,6 @@ public sealed class TestesManipuladorAlterarPerfilUsuario
         public Task<bool> ExisteCpfAsync(string cpf, Guid? ignorarId, CancellationToken token = default) =>
             Task.FromResult(false);
 
-        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
+        public Task<ResultadoGravacaoUsuario> TentarAdicionarAsync(Usuario item, LogUsuario registroCadastro, UserCreatedEvent eventoCriacao, CancellationToken token = default) => Task.FromResult(ResultadoGravacaoUsuario.Sucesso);
     }
 }
