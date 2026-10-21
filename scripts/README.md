@@ -1,6 +1,6 @@
-# Roteiros locais — E11 a E15
+# Roteiros locais — E11 a E17
 
-Executar os verificadores na raiz do UsersAPI. E15 exige PowerShell 7.4+, Git e Docker Linux; o build .NET ocorre dentro das imagens. Os verificadores E11–E14 também exigem SDK .NET 8. Para apenas usar a aplicação, siga o [guia curto Docker](../docs/operacao/EXECUTAR-DEMONSTRACAO-DOCKER.md); nenhum script PowerShell é obrigatório.
+Executar os verificadores na raiz do UsersAPI. O verificador E16 exige PowerShell 7.4+, Git e Docker Linux; o build .NET ocorre dentro das imagens. Os verificadores E11–E14 também exigem SDK .NET 8. Para apenas usar a aplicação, siga o [guia atual](../README.md); nenhum script PowerShell é obrigatório.
 
 | Roteiro | Ação |
 |---|---|
@@ -13,15 +13,32 @@ Executar os verificadores na raiz do UsersAPI. E15 exige PowerShell 7.4+, Git e 
 | [Aplicar-MigrationOutboxLocal.ps1](Aplicar-MigrationOutboxLocal.ps1) | Configura o banco local, restaura EF e aplica migrations atuais em Release. |
 | [Verificar-OutboxLocal.ps1](Verificar-OutboxLocal.ps1) | Inicia Kestrel oculto com publicador desabilitado, cria conta sintética, consulta três registros e encerra seu processo. -Porta permite trocar 5091. |
 
-## Reproduzir a E15
+## Reproduzir a E17 sem arquivos RabbitMQ
+
+```powershell
+pwsh -NoProfile -File scripts/Verificar-DemonstracaoE15.ps1 -SemArquivosRabbitMq
+```
+
+O parâmetro usa um projeto descartável novo e um broker sem configurações/definitions montados. Comprova que a fila e a exchange não existiam antes do Users, que a demonstração declara a rota e publica os eventos, e que dados, chaves e mensagens sobrevivem ao reinício. Não inicia Notifications nem altera o Compose do grupo.
+
+Resultado sanitizado: `TestResults/E17/demonstracao-e17.json`. As evidências históricas foram preservadas fora do pacote de implementação. Esse roteiro é uma verificação opcional para quem desenvolve; o grupo incorpora somente o [fluxo atual de inicialização e exportação](../tools/FCG.Users.DemoSetup/README.md).
+
+
+## Reproduzir a E16
+
+O nome do arquivo permanece por compatibilidade:
 
 ```powershell
 .\scripts\Verificar-DemonstracaoE15.ps1
 ```
 
-A prova usa outra cópia em TestResults/E15 e outro nome de projeto Compose, com portas livres. Não usa as chaves locais antigas, o banco do monólito ou os volumes da demonstração normal fcg-users-demo. Faz a subida pelo mesmo Compose, verifica os fluxos essenciais, para sem apagar volumes e confirma preservação na segunda subida. Também confere as recusas explícitas da preparação fora do ambiente permitido.
+O roteiro agora verifica a preparação interna em uma imagem e um container Users, sem serviço preparacao. Copia a fonte atual para TestResults/E16 e usa outro projeto Compose, portas livres e volumes novos.
 
-Ao terminar, remove somente containers/rede/volumes do projeto aleatório criado pela própria prova. Conserva a cópia de fonte e o relatório sanitizado em TestResults/E15/demonstracao-e15.json, ignorados pelo Git. Não imprime tokens, senhas reais, conexão pessoal ou chave privada. [Evidências E15](../docs/evidencias/E15/README.md).
+Confere cadastro, login, autorização, assinatura RS256, auditoria, Outbox e fila; reinício preservando dados e chaves; UID 1654 e permissões dos PEMs; recusa de Production/ambientes contraditórios/flag inválida; flag false sem bootstrap; cancelamento real antes do HTTP.
+
+A limpeza remove somente recursos identificados pelo UUID da própria prova. Preserva o ambiente normal e os recursos do grupo. O relatório sanitizado fica em TestResults/E16/demonstracao-e16.json, ignorado pelo Git.
+
+Os resultados E15 de outubro são históricos do desenho anterior com preparador separado. Os roteiros E11–E14 continuam abaixo para suas respectivas verificações.
 
 ## Reproduzir a E14
 

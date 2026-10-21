@@ -19,21 +19,27 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0.31-bookworm-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /data/jwt \
-    && chown app:app /data/jwt
+    && mkdir -p /data/jwt /data/jwt-publica \
+    && chown app:app /data/jwt /data/jwt-publica \
+    && chmod 0700 /data/jwt \
+    && chmod 0755 /data/jwt-publica
 WORKDIR /app
-ENV ASPNETCORE_HTTP_PORTS=8080
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    DemonstracaoLocal__Habilitada=false
+# app mantém o usuário não privilegiado (UID 1654) da imagem oficial .NET.
 USER app
 
-# Job que termina depois de preparar o ambiente de demonstração.
+# Alvo legado: permanece disponível para as provas/integrações que usam o job separado.
 FROM runtime AS preparacao
 COPY --from=build /out/preparacao/ ./
 ENTRYPOINT ["dotnet", "FCG.Users.DemoSetup.dll", "--preparar-demonstracao"]
 
-# Host HTTP; não aplica migrations nem gera chaves na inicialização.
+# Uma imagem distribui API e preparador; a flag explícita controla o bootstrap local.
 FROM runtime AS api
 COPY --from=build /out/api/ ./
+COPY --from=build /out/preparacao/ ./preparacao/
+COPY --chmod=0555 infra/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
 EXPOSE 8080
-HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=12 \
+HEALTHCHECK --interval=5s --timeout=3s --start-period=90s --retries=12 \
     CMD curl --fail --silent --output /dev/null http://127.0.0.1:8080/health || exit 1
-ENTRYPOINT ["dotnet", "FCG.Users.Api.dll"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -51,27 +51,13 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  preparacao:
-    build:
-      context: .
-      target: preparacao
-    environment:
-      <<: *configuracao-base
-      DOTNET_RUNNING_IN_CONTAINER: "true"
-      DemonstracaoLocal__Habilitada: "true"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - jwt-chaves:/data/jwt
-    restart: "no"
-
   usersapi:
     build:
       context: .
       target: api
     environment:
       <<: *configuracao-base
+      DemonstracaoLocal__Habilitada: "true"
       ASPNETCORE_HTTP_PORTS: "8080"
       Swagger__Enabled: "true"
       Outbox__Enabled: "true"
@@ -84,10 +70,10 @@ services:
     ports:
       - "127.0.0.1:${FCG_USERS_HTTP_PORT:-5088}:8080"
     volumes:
-      - jwt-chaves:/data/jwt:ro
+      - jwt-chaves:/data/jwt
     depends_on:
-      preparacao:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped

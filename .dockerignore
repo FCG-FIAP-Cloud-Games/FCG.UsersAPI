@@ -9,6 +9,9 @@
 !tools/
 !tools/FCG.Users.DemoSetup/
 !tools/FCG.Users.DemoSetup/**
+!infra/
+!infra/runtime/
+!infra/runtime/docker-entrypoint.sh
 **/bin/
 **/obj/
 **/.vs/

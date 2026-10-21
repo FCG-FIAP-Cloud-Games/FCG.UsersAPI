@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/FCG.Users.Api/FCG.Users.Api.csproj" />
     <ProjectReference Include="../../src/FCG.Users.Infrastructure/FCG.Users.Infrastructure.csproj" />
+    <ProjectReference Include="../../tools/FCG.Users.DemoSetup/FCG.Users.DemoSetup.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -23,6 +23,7 @@ internal sealed class PreparadorDemonstracao
     private const long IdentificadorLock = 84645159015001;
     private readonly IConfiguration _configuracao;
     private readonly ConfiguracaoJwt _configuracaoJwt;
+    private readonly string? _caminhoExportacaoPublica;
 
     public PreparadorDemonstracao(IConfiguration configuracao)
     {
@@ -31,6 +32,7 @@ internal sealed class PreparadorDemonstracao
         _configuracao = configuracao;
         _configuracaoJwt = ConfiguracaoJwt.Criar(configuracao);
         ValidarConfiguracaoChaves(_configuracaoJwt);
+        _caminhoExportacaoPublica = ExportadorChavePublica.ValidarCaminho(configuracao["Jwt:PublicKeyExport:Path"]);
     }
 
     public async Task ExecutarAsync(CancellationToken tokenCancelamento)
@@ -88,6 +90,12 @@ internal sealed class PreparadorDemonstracao
             if (resultado is not (StatusInicializacaoAdministrador.Criado or StatusInicializacaoAdministrador.JaExistente))
                 throw new InvalidOperationException("Não foi possível preparar o administrador sintético.");
 
+            if (_caminhoExportacaoPublica is not null)
+            {
+                ExportadorChavePublica.Exportar(CaminhoPublica, _caminhoExportacaoPublica, tokenCancelamento);
+                Console.WriteLine("Cópia exclusiva da chave pública pronta no volume de integração.");
+            }
+
             Console.WriteLine("Preparação da demonstração concluída.");
         }
         finally
@@ -115,6 +123,8 @@ internal sealed class PreparadorDemonstracao
     {
         if (!OperatingSystem.IsLinux()
             || configuracao["DOTNET_ENVIRONMENT"] != "Development"
+            || (configuracao["ASPNETCORE_ENVIRONMENT"] is { } ambienteAspNet
+                && ambienteAspNet != "Development")
             || configuracao["DOTNET_RUNNING_IN_CONTAINER"] != "true"
             || configuracao["DemonstracaoLocal:Habilitada"] != "true")
             throw new InvalidOperationException("A preparação exige o contêiner Linux de demonstração em Development.");

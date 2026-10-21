@@ -40,8 +40,22 @@ public static class ConfiguracaoMensageria
                     if (rabbit.UseTls)
                         host.UseSsl(tls => { tls.Protocol = SslProtocols.Tls12 | SslProtocols.Tls13; tls.ServerName = rabbit.Host; });
                 });
-                transporte.Message<UserCreatedEvent>(mensagem =>
-                    mensagem.SetEntityName(DefinicaoUserCreatedEvent.Tipo["urn:message:".Length..]));
+                var exchangeEvento = DefinicaoUserCreatedEvent.Tipo["urn:message:".Length..];
+                transporte.Message<UserCreatedEvent>(mensagem => mensagem.SetEntityName(exchangeEvento));
+
+                if (HabilitarTopologiaDemonstracao(configuracao))
+                {
+                    // Somente na demonstração, o publish declara a fila sem importar arquivos do broker.
+                    // O vínculo direto ao exchange do evento não cria um consumidor no UsersAPI.
+                    transporte.Publish<UserCreatedEvent>(publicacao =>
+                        publicacao.BindQueue(exchangeEvento, "notifications-user-created", fila =>
+                        {
+                            fila.ExchangeType = "fanout";
+                            fila.Durable = true;
+                            fila.AutoDelete = false;
+                            fila.Exclusive = false;
+                        }));
+                }
             });
         });
         servicos.Configure<MassTransitHostOptions>(opcoes =>
@@ -53,5 +67,16 @@ public static class ConfiguracaoMensageria
         });
         servicos.AddSingleton<IPublicadorEventos, PublicadorRabbitMq>();
         return servicos;
+    }
+
+    private static bool HabilitarTopologiaDemonstracao(IConfiguration configuracao)
+    {
+        var ambienteAspNet = configuracao["ASPNETCORE_ENVIRONMENT"];
+        // Não provisionar a assinatura da demonstração em Production ou com flags conflitantes.
+        return OperatingSystem.IsLinux()
+            && configuracao["DemonstracaoLocal:Habilitada"] == "true"
+            && configuracao["DOTNET_ENVIRONMENT"] == "Development"
+            && configuracao["DOTNET_RUNNING_IN_CONTAINER"] == "true"
+            && (ambienteAspNet is null || ambienteAspNet == "Development");
     }
 }
