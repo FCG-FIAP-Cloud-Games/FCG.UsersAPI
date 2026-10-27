@@ -53,6 +53,25 @@ public sealed class ChavesJwtRsa : IDisposable
         }
     }
 
+    public object CriarJwks()
+    {
+        ObjectDisposedException.ThrowIf(_descartado, this);
+        return new
+        {
+            keys = _chavesPublicas.Select(entry =>
+            {
+                var parametros = entry.Value.Rsa.ExportParameters(includePrivateParameters: false);
+                return new
+                {
+                    kty = "RSA", use = "sig", alg = SecurityAlgorithms.RsaSha256,
+                    kid = entry.Key,
+                    n = Base64UrlEncoder.Encode(parametros.Modulus!),
+                    e = Base64UrlEncoder.Encode(parametros.Exponent!)
+                };
+            }).ToArray()
+        };
+    }
+
     public SigningCredentials CriarCredenciaisAssinatura()
     {
         ObjectDisposedException.ThrowIf(_descartado, this);

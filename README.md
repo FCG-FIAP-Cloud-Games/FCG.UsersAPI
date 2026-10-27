@@ -81,3 +81,7 @@ dotnet test FCG.Users.sln -c Release
 Os testes de integração usam Docker quando precisam de PostgreSQL/RabbitMQ. Os testes de exportação cobrem PEM público, rejeição de privada/configurações indevidas, gravação atômica, preservação, permissões e links simbólicos. O verificador `scripts/Verificar-DemonstracaoE15.ps1` é uma prova opcional de instalação e retomada; não participa da execução do grupo.
 
 As evidências temporárias ficam em `TestResults`, ignorado pelo Git. Os materiais antigos E16/E17 e os exemplos anteriores de distribuição foram preservados no histórico local durante a revisão de pendências; não são necessários para construir ou executar esta versão.
+
+## Chaves públicas por JWKS
+
+O endpoint anônimo `GET /.well-known/jwks.json` publica somente os componentes públicos RSA configurados e seus identificadores. A chave privada permanece na aplicação. O Catalog pode obter as chaves por HTTP interno em Development e validar os tokens localmente com cache. A imagem Kubernetes desta alteração é Users 1.5, publicada no Docker Hub em 27/10/2026. O modo anterior de arquivos permanece compatível.
